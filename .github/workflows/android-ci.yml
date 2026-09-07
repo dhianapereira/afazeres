@@ -1,0 +1,75 @@
+name: Android CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: android-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Build, lint, and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check for Android changes
+        id: changes
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                per_page: 100,
+              },
+            );
+
+            const isIgnored = (path) =>
+              path.startsWith('.github/') ||
+              path.startsWith('assets/') ||
+              path.startsWith('docs/') ||
+              path.startsWith('scripts/') ||
+              path.toLowerCase().endsWith('.md');
+
+            const relevant = files.some((file) =>
+              !isIgnored(file.filename) ||
+              (file.previous_filename && !isIgnored(file.previous_filename))
+            );
+
+            core.setOutput('relevant', relevant.toString());
+            core.info(
+              relevant
+                ? 'Android-related changes found; running checks.'
+                : 'Only assets, docs, scripts, or workflow files changed; skipping Android checks.'
+            );
+
+      - name: Check out repository
+        if: steps.changes.outputs.relevant == 'true'
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        if: steps.changes.outputs.relevant == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        if: steps.changes.outputs.relevant == 'true'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Run quality checks
+        if: steps.changes.outputs.relevant == 'true'
+        run: ./gradlew --no-daemon lintDebug testDebugUnitTest compileDebugAndroidTestSources assembleDebug
