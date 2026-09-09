@@ -29,7 +29,7 @@ class AfazeresViewModel(application: Application) : AndroidViewModel(application
             try { withContext(Dispatchers.IO) { block() }; success?.invoke() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) {
-                val message = when ((e as? BackupException)?.reason) { "empty" -> R.string.backup_empty; "large" -> R.string.backup_large; "version" -> R.string.backup_version; "invalid" -> R.string.backup_invalid; else -> R.string.operation_error }
+                val message = if (e is CategoryInUseException) R.string.category_in_use else when ((e as? BackupException)?.reason) { "empty" -> R.string.backup_empty; "large" -> R.string.backup_large; "version" -> R.string.backup_version; "invalid" -> R.string.backup_invalid; else -> R.string.operation_error }
                 operationError.value = message
                 messages.send(message)
             }
@@ -39,6 +39,7 @@ class AfazeresViewModel(application: Application) : AndroidViewModel(application
     fun save(task: Task, success: () -> Unit) = perform(success) { repository.save(task.copy(title = task.title.trim(), updatedAt = System.currentTimeMillis())) }
     fun save(category: Category, success: () -> Unit) = perform(success) { repository.save(category.copy(name = category.name.trim())) }
     fun delete(task: Task, success: () -> Unit) = perform(success) { repository.delete(task) }
+    fun delete(category: Category, success: () -> Unit) = perform(success) { repository.delete(category) }
     fun theme(value: String) = perform { app.preferences.theme(value) }
     fun export(uri: Uri) = perform {
         val text = BackupCodec.encode(repository.snapshot())

@@ -12,7 +12,9 @@ O Afazeres permite anotar uma tarefa diretamente na tela inicial e adicionar os 
 - Ordenação por prioridade: alta, média, baixa e sem prioridade.
 - Filtros combinados por prioridade e categoria, acessíveis por um botão na tela inicial.
 - Arquivamento automático ao concluir, com acesso aos arquivados pelas configurações e opção de reabrir.
-- Categorias personalizadas para organizar os afazeres.
+- Criação, edição, visualização e exclusão de categorias com nome, cor principal e ícone independentes.
+- Cores personalizadas com prévia, paleta, controles de cor e código hexadecimal.
+- Exclusão de categorias bloqueada enquanto houver afazeres vinculados, inclusive arquivados.
 - Temas claro, escuro ou definido pelo sistema.
 - Interface em português e inglês.
 - Exportação e restauração dos afazeres e categorias por arquivos JSON.
@@ -86,6 +88,8 @@ O projeto utiliza MVVM e organiza persistência e interface por responsabilidade
 - `data/Preferences.kt`: preferências persistidas com DataStore.
 - `ui/AfazeresViewModel.kt`: estado da interface e coordenação das operações de dados.
 - `ui/AfazeresApp.kt`: navegação, afazeres, categorias, detalhes e formulários.
+- `ui/CategoryEditor.kt`: formulários de categoria, seleção de cores e ícones.
+- `model/CategoryAppearance.kt`: catálogo de ícones e validação de cores.
 - `ui/SettingsScreen.kt`: preferências, dados e backup, informações legais e sobre o app.
 - `ui/theme/`: cores, formas e temas do Jetpack Compose.
 

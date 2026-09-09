@@ -56,6 +56,7 @@ fun AfazeresApp(vm: AfazeresViewModel) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var quickTitle by rememberSaveable { mutableStateOf("") }
     var settingsPage by rememberSaveable { mutableStateOf("main") }
+    var managedCategoryId by rememberSaveable { mutableStateOf<String?>(null) }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var categoryFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var priorityFilter by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -68,6 +69,7 @@ fun AfazeresApp(vm: AfazeresViewModel) {
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { it?.let(vm::export) }
     val restore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { restoreUri = it?.toString() }
     val task = tasks.find { it.id == selected }
+    val managedCategory = categories.find { it.id == managedCategoryId }
     val addTask: () -> Unit = {
         if (!busy && quickTitle.isNotBlank()) {
             val submittedTitle = quickTitle
@@ -110,7 +112,8 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                                     }
                                 }
                             }
-                            if (tab == 1 && categoryFilter == null) IconButton(onClick = { sheet = "category" }, enabled = !busy) { Icon(Icons.Outlined.Add, stringResource(R.string.new_category)) }
+                            if (tab == 1 && categoryFilter != null) IconButton(onClick = { managedCategoryId = categoryFilter; sheet = "category_actions" }) { Icon(Icons.Outlined.MoreHoriz, stringResource(R.string.category_actions)) }
+                            if (tab == 1 && categoryFilter == null) IconButton(onClick = { managedCategoryId = null; sheet = "category" }, enabled = !busy) { Icon(Icons.Outlined.Add, stringResource(R.string.new_category)) }
                         }
                         when {
                             tab == 0 || categoryFilter != null -> {
@@ -144,12 +147,14 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                             tab == 1 && categories.isEmpty() -> EmptyState(R.string.empty_categories)
                             tab == 1 -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                                 items(categories, key = { it.id }) { category ->
-                                    Surface(onClick = { categoryFilter = category.id }, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
+                                    Surface(onClick = { categoryFilter = category.id; priorityFilter = null }, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
                                         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                             CategoryIcon(category)
                                             Text(categoryName(category), Modifier.weight(1f).padding(horizontal = 16.dp))
                                             Text(java.text.NumberFormat.getIntegerInstance().format(tasks.count { it.categoryId == category.id && !it.done }), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Icon(Icons.Outlined.ChevronRight, null, Modifier.padding(start = 12.dp))
+                                            IconButton(onClick = { managedCategoryId = category.id; sheet = "category_actions" }) {
+                                                Icon(Icons.Outlined.MoreHoriz, stringResource(R.string.category_options, categoryName(category)))
+                                            }
                                         }
                                     }
                                 }
@@ -187,7 +192,28 @@ fun AfazeresApp(vm: AfazeresViewModel) {
         categoryFilter = category
         sheet = null
     }
-    if (sheet == "category") CategoryEditor(busy, { sheet = null }) { vm.save(it) { sheet = null } }
+    if (sheet == "category") CategoryEditor(null, "", busy, { sheet = null }) { vm.save(it) { sheet = null } }
+    if (sheet == "category_edit" && managedCategory != null) CategoryEditor(managedCategory, categoryName(managedCategory), busy, { sheet = null }) { vm.save(it) { sheet = null } }
+    if (sheet == "category_actions" && managedCategory != null) AppSheet(R.string.category_actions, { sheet = null }) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            CategoryIcon(managedCategory)
+            Text(categoryName(managedCategory), style = MaterialTheme.typography.titleLarge)
+        }
+        SettingsRow(Icons.Outlined.ListAlt, R.string.view_category_tasks, "") { categoryFilter = managedCategory.id; priorityFilter = null; tab = 1; sheet = null }
+        SettingsRow(Icons.Outlined.Edit, R.string.edit_category, "") { sheet = "category_edit" }
+        TextButton(onClick = { sheet = "category_delete" }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.delete_category), color = MaterialTheme.colorScheme.error) }
+    }
+    if (sheet == "category_delete" && managedCategory != null) AppSheet(R.string.delete_category, { if (!busy) sheet = null }) {
+        val inUse = tasks.any { it.categoryId == managedCategory.id }
+        Text(stringResource(if (inUse) R.string.category_in_use else R.string.delete_category_confirmation, categoryName(managedCategory)))
+        if (!inUse) Button(
+            onClick = { vm.delete(managedCategory) { if (categoryFilter == managedCategory.id) categoryFilter = null; managedCategoryId = null; sheet = null } },
+            enabled = !busy,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        ) { Text(stringResource(R.string.delete_category)) }
+        TextButton(onClick = { sheet = null }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
+    }
     if (sheet == "theme") AppSheet(R.string.theme, { sheet = null }) {
         listOf("system" to R.string.system, "light" to R.string.light, "dark" to R.string.dark).forEach { (value, label) ->
             SheetChoice(stringResource(label), theme == value, when (value) { "dark" -> Icons.Outlined.DarkMode; "light" -> Icons.Outlined.LightMode; else -> Icons.Outlined.SettingsBrightness }) { if (!busy) { vm.theme(value); sheet = null } }
@@ -215,22 +241,21 @@ private val priorityLabels = listOf(R.string.no_priority, R.string.low, R.string
 private fun priorityLabel(priority: Int) = priorityLabels[priority + 1]
 @Composable private fun priorityColor(priority: Int): Color = when (priority) { -1 -> MaterialTheme.colorScheme.onSurfaceVariant; 2 -> MaterialTheme.colorScheme.error; 1 -> if (MaterialTheme.colorScheme.background.red < .5f) Color(0xFFF2B54C) else Color(0xFF956000); else -> if (MaterialTheme.colorScheme.background.red < .5f) Color(0xFF62ADFF) else Color(0xFF1267B0) }
 private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined.Remove; 2 -> Icons.Outlined.ArrowUpward; 1 -> Icons.Outlined.Remove; else -> Icons.Outlined.ArrowDownward }
-@Composable private fun categoryName(category: Category): String = if (!category.builtIn) category.name else stringResource(when (category.id) { "work" -> R.string.work; "study" -> R.string.study; "personal" -> R.string.personal; "health" -> R.string.health; "reading" -> R.string.reading; "finance" -> R.string.finance; else -> R.string.others })
-private fun categoryIcon(category: Category) = when (category.color) { 0 -> Icons.Outlined.WorkOutline; 1, 4 -> Icons.Outlined.MenuBook; 2 -> Icons.Outlined.PersonOutline; 3 -> Icons.Outlined.FavoriteBorder; 5 -> Icons.Outlined.Paid; else -> Icons.Outlined.MoreHoriz }
-@Composable private fun CategoryIcon(category: Category) {
-    val color = CategoryColors[category.color]
-    Surface(shape = MaterialTheme.shapes.small, color = color.copy(alpha = .14f)) { Icon(categoryIcon(category), null, Modifier.padding(12.dp), tint = color) }
+@Composable internal fun categoryName(category: Category): String = if (!category.builtIn) category.name else stringResource(when (category.id) { "work" -> R.string.work; "study" -> R.string.study; "personal" -> R.string.personal; "health" -> R.string.health; "reading" -> R.string.reading; "finance" -> R.string.finance; else -> R.string.others })
+@Composable internal fun CategoryIcon(category: Category) {
+    val color = Color(category.color)
+    Surface(shape = MaterialTheme.shapes.small, color = color.copy(alpha = .14f)) { Icon(categoryIcon(category), null, Modifier.padding(12.dp), tint = categoryContentColor(category)) }
 }
 @Composable private fun CategoryBadge(category: Category) {
-    val color = CategoryColors[category.color]
+    val color = Color(category.color)
     Surface(shape = MaterialTheme.shapes.small, color = color.copy(alpha = .14f)) {
-        Text(categoryName(category), Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = if (MaterialTheme.colorScheme.background.red < .5f) color else Color(color.red * .55f, color.green * .55f, color.blue * .55f))
+        Text(categoryName(category), Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = categoryContentColor(category))
     }
 }
 @Composable private fun TaskCard(task: Task, category: Category?, onClick: () -> Unit) {
     Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.padding(top = 6.dp).size(11.dp).background(category?.let { CategoryColors[it.color] } ?: priorityColor(task.priority), CircleShape))
+            Box(Modifier.padding(top = 6.dp).size(11.dp).background(category?.let { Color(it.color) } ?: priorityColor(task.priority), CircleShape))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(task.title, style = MaterialTheme.typography.bodyLarge)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -278,8 +303,16 @@ private fun categoryIcon(category: Category) = when (category.color) { 0 -> Icon
     }
 }
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun AppSheet(title: Int, dismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+@Composable internal fun AppSheet(title: Int, dismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     val focus = LocalFocusManager.current
+    val scrollState = rememberScrollState()
+    var scrollTitle by rememberSaveable { mutableIntStateOf(title) }
+    LaunchedEffect(title) {
+        if (scrollTitle != title) {
+            scrollState.scrollTo(0)
+            scrollTitle = title
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = dismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -296,7 +329,7 @@ private fun categoryIcon(category: Category) = when (category.color) { 0 -> Icon
                     val up = waitForUpOrCancellation()
                     if (up != null && !up.isConsumed) focus.clearFocus()
                 }
-            }.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+            }.verticalScroll(scrollState).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -329,7 +362,7 @@ private fun categoryIcon(category: Category) = when (category.color) { 0 -> Icon
     }
 }
 
-@Composable private fun SheetField(value: String, onChange: (String) -> Unit, label: Int, error: Boolean = false, lines: Int = 1) {
+@Composable internal fun SheetField(value: String, onChange: (String) -> Unit, label: Int, error: Boolean = false, lines: Int = 1) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -363,7 +396,7 @@ private fun categoryIcon(category: Category) = when (category.color) { 0 -> Icon
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 FilterChip(selected = category == null, onClick = { category = null }, label = { Text(stringResource(R.string.no_category)) })
                 categories.forEach { c ->
-                    FilterChip(selected = category == c.id, onClick = { category = c.id }, label = { Text(categoryName(c)) }, leadingIcon = { Icon(categoryIcon(c), null, Modifier.size(18.dp), tint = CategoryColors[c.color]) })
+                    FilterChip(selected = category == c.id, onClick = { category = c.id }, label = { Text(categoryName(c)) }, leadingIcon = { Icon(categoryIcon(c), null, Modifier.size(18.dp), tint = categoryContentColor(c)) })
                 }
             }
             Text(stringResource(R.string.priority), style = MaterialTheme.typography.titleSmall)
@@ -383,30 +416,6 @@ private fun categoryIcon(category: Category) = when (category.color) { 0 -> Icon
             Icon(Icons.Outlined.Check, null, Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.save))
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable private fun CategoryEditor(busy: Boolean, dismiss: () -> Unit, save: (Category) -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var color by rememberSaveable { mutableIntStateOf(0) }
-    var attempted by rememberSaveable { mutableStateOf(false) }
-    AppSheet(R.string.new_category, { if (!busy) dismiss() }) {
-        SheetField(name, { if (it.length <= 60) name = it }, R.string.category_name, attempted && name.isBlank())
-        Text(stringResource(R.string.category_style), style = MaterialTheme.typography.titleSmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            CategoryColors.forEachIndexed { index, tint ->
-                Surface(shape = MaterialTheme.shapes.medium, color = tint.copy(alpha = .12f), border = if (color == index) BorderStroke(2.dp, tint) else null) {
-                    IconToggleButton(checked = color == index, onCheckedChange = { color = index }, modifier = Modifier.size(56.dp)) {
-                        Icon(if (color == index) Icons.Outlined.Check else categoryIcon(Category("", "", index)), stringResource(R.string.style_number, index + 1), tint = tint)
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        Button(onClick = { attempted = true; if (name.isNotBlank()) save(Category(UUID.randomUUID().toString(), name, color)) }, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            Icon(Icons.Outlined.Add, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.new_category))
         }
     }
 }
@@ -443,7 +452,7 @@ private fun categoryIcon(category: Category) = when (category.color) { 0 -> Icon
             "category" -> {
                 SheetChoice(stringResource(R.string.all_categories), category == null, Icons.Outlined.GridView) { category = null; page = "main" }
                 categories.forEach { item ->
-                    SheetChoice(categoryName(item), category == item.id, categoryIcon(item), CategoryColors[item.color]) { category = item.id; page = "main" }
+                    SheetChoice(categoryName(item), category == item.id, categoryIcon(item), categoryContentColor(item)) { category = item.id; page = "main" }
                 }
             }
         }

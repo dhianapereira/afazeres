@@ -32,4 +32,35 @@ class DatabaseTest {
         repo.restore(backup)
         assertEquals(backup, repo.snapshot())
     }
+    @Test fun blocksDeletingCategoryWithActiveOrArchivedTasks() = runTest {
+        val repo = TaskRepository(db)
+        val category = Category("protected", "Protected")
+        repo.save(category)
+        for (archived in listOf(false, true)) {
+            repo.save(Task("linked", "Linked", categoryId = category.id, done = archived))
+            try { repo.delete(category); fail("Must block category deletion") } catch (_: CategoryInUseException) { }
+            assertEquals(category, repo.snapshot().categories.single())
+            assertEquals(category.id, repo.snapshot().tasks.single().categoryId)
+        }
+    }
+    @Test fun databaseAlsoRejectsDirectDeletionOfReferencedCategory() = runTest {
+        val category = Category("protected", "Protected")
+        db.dao().save(category)
+        db.dao().save(Task("linked", "Linked", categoryId = category.id, done = true))
+        try { db.dao().delete(category); fail("Foreign key must block deletion") } catch (_: android.database.sqlite.SQLiteConstraintException) { }
+    }
+    @Test fun editsAppearanceWithoutLosingLinksThenRemovesUnusedCategory() = runTest {
+        val repo = TaskRepository(db)
+        val original = Category("category", "Original")
+        repo.save(original)
+        repo.save(Task("linked", "Linked", categoryId = original.id))
+        val edited = original.copy(name = "Edited", color = 0xFF123456L, icon = "pet")
+        repo.save(edited)
+        assertEquals(edited, repo.snapshot().categories.single())
+        assertEquals(original.id, repo.snapshot().tasks.single().categoryId)
+        repo.save(repo.snapshot().tasks.single().copy(categoryId = null))
+        repo.delete(edited)
+        assertTrue(repo.snapshot().categories.isEmpty())
+        assertEquals(1, repo.snapshot().tasks.size)
+    }
 }
