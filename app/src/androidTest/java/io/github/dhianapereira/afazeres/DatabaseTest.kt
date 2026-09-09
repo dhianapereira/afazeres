@@ -168,4 +168,154 @@ class DatabaseTest {
         repo.restore(BackupCodec.decode(exported))
         assertEquals(original, repo.snapshot())
     }
+    private suspend fun learningHistory(repo: TaskRepository) {
+        repo.save(Category("work", "Work")); repo.save(Category("personal", "Personal"))
+        repeat(4) {
+            repo.save(Task("w$it", "Revisar contrato cliente", categoryId = "work", priority = 2, done = true))
+            repo.save(Task("p$it", "Comprar frutas mercado", categoryId = "personal", priority = 0))
+        }
+    }
+    @Test fun newTasksLearnFromManualHistoryAndBackupPreservesLearning() = runTest {
+        val repo = TaskRepository(db)
+        repo.create(Task("cold", "Revisar contrato cliente"))
+        assertNull(repo.snapshot().tasks.single().categoryId)
+        learningHistory(repo)
+        repo.create(Task("automatic", "Revisar contrato do cliente"))
+        val automatic = db.dao().task("automatic")!!
+        assertEquals("work", automatic.categoryId); assertEquals(2, automatic.priority)
+        assertFalse(automatic.categoryConfirmed); assertFalse(automatic.priorityConfirmed)
+        val backup = BackupCodec.encode(repo.snapshot())
+        repo.restore(BackupCodec.decode(backup))
+        assertEquals(automatic, db.dao().task("automatic"))
+        TaskRepository(db).create(Task("after-restore", automatic.title))
+        assertEquals("work", db.dao().task("after-restore")!!.categoryId)
+    }
+    @Test fun repeatedSavesAndStatusChangesDoNotManufactureTrainingExamples() = runTest {
+        val repo = TaskRepository(db)
+        repo.save(Category("work", "Work"))
+        repo.save(Category("personal", "Personal"))
+        repeat(20) {
+            repo.save(Task("one", "Revisar contrato cliente", categoryId = "work", priority = 2, done = it % 2 == 0))
+        }
+        repo.save(Task("two", "Comprar frutas mercado", categoryId = "personal", priority = 0))
+        repo.create(Task("new", "Revisar contrato cliente"))
+        assertNull(db.dao().task("new")!!.categoryId)
+        assertEquals(-1, db.dao().task("new")!!.priority)
+    }
+    @Test fun automaticTaskStatusChangesDoNotConfirmLabels() = runTest {
+        val repo = TaskRepository(db)
+        learningHistory(repo)
+        repo.create(Task("automatic", "Revisar contrato cliente"))
+        repo.completeTasks(listOf("automatic"))
+        repo.reopenArchived(listOf("automatic"))
+        val stored = db.dao().task("automatic")!!
+        assertFalse(stored.categoryConfirmed); assertFalse(stored.priorityConfirmed)
+        repo.save(stored.copy(categoryId = "personal", categoryConfirmed = true))
+        assertTrue(db.dao().task("automatic")!!.categoryConfirmed)
+        assertFalse(db.dao().task("automatic")!!.priorityConfirmed)
+    }
+    @Test fun deletionPreservesLearningAndRestoreReplacesHistory() = runTest {
+        val repo = TaskRepository(db)
+        learningHistory(repo)
+        repo.deleteArchived(listOf("w0", "w1", "w2", "w3"))
+        repo.create(Task("after-delete", "Revisar contrato cliente"))
+        assertEquals("work", db.dao().task("after-delete")!!.categoryId)
+        repo.restore(Backup(emptyList(), emptyList()))
+        repo.create(Task("after-clear", "Comprar frutas mercado"))
+        assertNull(db.dao().task("after-clear")!!.categoryId)
+    }
+    @Test fun resetPreservesTaskValuesAndStaleSavesCannotRestoreExcludedExamples() = runTest {
+        val repo = TaskRepository(db)
+        learningHistory(repo)
+        val before = repo.snapshot()
+        val stale = before.tasks.first()
+        repo.resetLearning(io.github.dhianapereira.afazeres.model.nlp.LearningTarget.CATEGORY)
+        val reset = repo.snapshot()
+        assertEquals(before.tasks.map { it.copy(categoryTrainingExcluded = true) }, reset.tasks)
+        assertEquals(before.categories, reset.categories)
+        repo.save(stale.copy(note = "Unrelated edit"))
+        assertTrue(db.dao().task(stale.id)!!.categoryTrainingExcluded)
+        assertFalse(db.dao().task(stale.id)!!.priorityTrainingExcluded)
+        repo.save(stale, confirmCategory = true)
+        assertFalse(db.dao().task(stale.id)!!.categoryTrainingExcluded)
+    }
+    @Test fun resetSurvivesBackupAndUnrelatedStatusUpdates() = runTest {
+        val repo = TaskRepository(db)
+        learningHistory(repo)
+        repo.resetLearning(io.github.dhianapereira.afazeres.model.nlp.LearningTarget.BOTH)
+        repo.completeTasks(listOf("p0")); repo.reopenArchived(listOf("w0"))
+        repo.restore(BackupCodec.decode(BackupCodec.encode(repo.snapshot())))
+        repo.create(Task("after-reset", "Revisar contrato cliente"))
+        assertNull(db.dao().task("after-reset")!!.categoryId)
+        assertEquals(-1, db.dao().task("after-reset")!!.priority)
+        assertTrue(db.dao().task("w0")!!.categoryConfirmed)
+        assertTrue(db.dao().task("w0")!!.categoryTrainingExcluded)
+    }
+    @Test fun disabledAutomationDoesNotFillButKeepsHistoryAvailableForAudit() = runTest {
+        val repo = TaskRepository(db)
+        learningHistory(repo)
+        repo.create(Task("disabled", "Revisar contrato cliente"), automatic = false)
+        assertNull(db.dao().task("disabled")!!.categoryId)
+        assertEquals(-1, db.dao().task("disabled")!!.priority)
+        assertEquals("category:work", repo.explain("Revisar contrato cliente").category.prediction!!.label)
+    }
+    @Test fun priorityResetAndNewManualChoicesStartANewHistory() = runTest {
+        val repo = TaskRepository(db)
+        learningHistory(repo)
+        repo.resetLearning(io.github.dhianapereira.afazeres.model.nlp.LearningTarget.PRIORITY)
+        assertTrue(repo.snapshot().tasks.all { it.priorityTrainingExcluded && !it.categoryTrainingExcluded })
+        for (task in repo.snapshot().tasks) repo.save(task, confirmPriority = true)
+        repo.create(Task("relearned", "Revisar contrato cliente"))
+        assertEquals(2, db.dao().task("relearned")!!.priority)
+    }
+    @Test fun deletedTasksKeepLearningThroughBackupAndReset() = runTest {
+        val repo = TaskRepository(db)
+        val task = Task("history", "Read book", priority = 2)
+        repo.save(task)
+        repo.deletePending(listOf(task.id))
+        assertTrue(repo.snapshot().tasks.isEmpty())
+        assertEquals(mapOf("read" to 1, "book" to 1), repo.snapshot().training.single().counts())
+        val backup = BackupCodec.decode(BackupCodec.encode(repo.snapshot()))
+        repo.resetLearning(io.github.dhianapereira.afazeres.model.nlp.LearningTarget.BOTH)
+        assertTrue(repo.snapshot().training.isEmpty())
+        repo.restore(backup)
+        assertEquals(2, repo.snapshot().training.single().priority)
+    }
+    @Test fun correctionsReplaceHistoryAndArchivedDeletionPreservesIt() = runTest {
+        val repo = TaskRepository(db)
+        val task = Task("history", "Read book", priority = 2)
+        repo.save(task)
+        repo.save(task.copy(priority = 0), confirmPriority = true)
+        repo.completeTasks(listOf(task.id))
+        repo.deleteArchived(listOf(task.id))
+        assertEquals(1, repo.snapshot().training.size)
+        assertEquals(0, repo.snapshot().training.single().priority)
+    }
+    @Test fun forgetDeletionRemovesOnlyMatchingTasksAndTheirContributions() = runTest {
+        val repo = TaskRepository(db)
+        repo.save(Task("pending", "Read book", priority = 2))
+        repo.save(Task("archived", "Read paper", priority = 1, done = true))
+        repo.deletePending(listOf("pending", "archived"), forget = true)
+        assertEquals(listOf("archived"), repo.snapshot().training.map { it.id })
+        repo.deleteArchived(listOf("archived"), forget = true)
+        assertTrue(repo.snapshot().training.isEmpty())
+        repo.save(Task("single", "Read report", priority = 0))
+        repo.delete(db.dao().task("single")!!, forget = true)
+        assertTrue(repo.snapshot().training.isEmpty())
+    }
+    @Test fun auditShowsDeletedCountsAndPredictionsSurviveWithoutTitles() = runTest {
+        val repo = TaskRepository(db)
+        learningHistory(repo)
+        val before = repo.explain("Revisar contrato cliente")
+        val ids = repo.snapshot().tasks.map { it.id }
+        repo.deletePending(ids)
+        repo.deleteArchived(ids)
+        assertEquals(before, repo.explain("Revisar contrato cliente"))
+        val snapshot = repo.snapshot()
+        val audit = io.github.dhianapereira.afazeres.model.nlp.TrainingExamples.summarize(snapshot.training, snapshot.tasks, snapshot.categories.map { it.id }.toSet())
+        assertTrue(audit.categories.isEmpty())
+        assertTrue(audit.priorities.isEmpty())
+        assertEquals(8, audit.categoryCount)
+        assertEquals(8, audit.priorityCount)
+    }
 }

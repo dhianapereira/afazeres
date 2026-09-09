@@ -24,7 +24,7 @@ class BackupCodecTest {
     @Test fun rejectsBlankTitle() { invalid(Backup(listOf(category), listOf(task.copy(title = "  ")))) }
     @Test fun rejectsUnknownBuiltInCategory() { invalid(Backup(listOf(category.copy(id = "unknown")), emptyList())) }
     @Test fun rejectsUnsupportedVersion() {
-        try { BackupCodec.decode(BackupCodec.encode(Backup(emptyList(), emptyList())).replace("\"version\": 3", "\"version\": 9")); fail() } catch (e: BackupException) { assertEquals("version", e.reason) }
+        try { BackupCodec.decode(BackupCodec.encode(Backup(emptyList(), emptyList())).replace("\"version\": 7", "\"version\": 9")); fail() } catch (e: BackupException) { assertEquals("version", e.reason) }
     }
     @Test fun reportsEmptyFile() { try { BackupCodec.decode(" "); fail() } catch (e: BackupException) { assertEquals("empty", e.reason) } }
     @Test fun rejectsMalformedFile() { try { BackupCodec.decode("{}"); fail() } catch (e: BackupException) { assertEquals("invalid", e.reason) } }
@@ -74,6 +74,72 @@ class BackupCodecTest {
         val backup = Backup(emptyList(), List(1500) { Task("t$it", "Title", note = "x".repeat(4000)) })
         try { BackupCodec.encode(backup); fail("Must reject oversized payload") }
         catch (e: BackupException) { assertEquals("large", e.reason) }
+    }
+    @Test fun preservesAutomaticAndHumanLabelProvenance() {
+        val automatic = task.copy(categoryConfirmed = false, priorityConfirmed = false)
+        val manualNone = Task("none", "No labels", categoryConfirmed = true, priorityConfirmed = true)
+        val backup = Backup(listOf(category), listOf(automatic, manualNone))
+        assertEquals(backup, BackupCodec.decode(BackupCodec.encode(backup)))
+    }
+    @Test fun versionThreeLabelsBecomeManualButEmptyFieldsDoNot() {
+        val backup = Backup(listOf(category), listOf(task, Task("empty", "Only title")))
+        val json = JSONObject(BackupCodec.encode(backup)).put("version", 3)
+        for (index in 0..1) {
+            json.getJSONArray("tasks").getJSONObject(index).remove("categoryConfirmed")
+            json.getJSONArray("tasks").getJSONObject(index).remove("priorityConfirmed")
+        }
+        assertEquals(backup, BackupCodec.decode(json.toString()))
+    }
+    @Test fun rejectsMissingOrNonBooleanProvenanceInNewBackups() {
+        for (field in listOf("categoryConfirmed", "priorityConfirmed")) for (value in listOf<Any?>(null, "true", 1)) {
+            val json = JSONObject(BackupCodec.encode(Backup(listOf(category), listOf(task))))
+            json.getJSONArray("tasks").getJSONObject(0).put(field, value)
+            try { BackupCodec.decode(json.toString()); fail("Invalid provenance must be rejected") }
+            catch (e: BackupException) { assertEquals("invalid", e.reason) }
+        }
+    }
+    @Test fun preservesResetExclusionsAcrossBackup() {
+        val excluded = task.copy(categoryTrainingExcluded = true, priorityTrainingExcluded = true)
+        val backup = Backup(listOf(category), listOf(excluded))
+        assertEquals(backup, BackupCodec.decode(BackupCodec.encode(backup)))
+    }
+    @Test fun versionFourKeepsHumanExamplesEligible() {
+        val backup = Backup(listOf(category), listOf(task))
+        val json = JSONObject(BackupCodec.encode(backup)).put("version", 4)
+        json.getJSONArray("tasks").getJSONObject(0).remove("categoryTrainingExcluded")
+        json.getJSONArray("tasks").getJSONObject(0).remove("priorityTrainingExcluded")
+        assertEquals(backup, BackupCodec.decode(json.toString()))
+    }
+    @Test fun newBackupsRequireBooleanExclusionFlags() {
+        val json = JSONObject(BackupCodec.encode(Backup(listOf(category), listOf(task))))
+        json.getJSONArray("tasks").getJSONObject(0).put("categoryTrainingExcluded", "true")
+        try { BackupCodec.decode(json.toString()); fail() } catch (e: BackupException) { assertEquals("invalid", e.reason) }
+    }
+    @Test fun deletedHistoryBackupContainsCountsWithoutOriginalText() {
+        val record = Task("deleted", "A private title!", note = "Secret description", priority = 2).trainingRecord()
+        val backup = Backup(emptyList(), emptyList(), listOf(record))
+        val text = BackupCodec.encode(backup)
+        assertFalse(text.contains("A private title!"))
+        assertFalse(text.contains("Secret description"))
+        assertFalse(JSONObject(text).getJSONArray("training").getJSONObject(0).has("title"))
+        assertEquals(backup, BackupCodec.decode(text))
+    }
+    @Test fun versionSixHistoryIsConvertedWithoutRetainingTitles() {
+        val old = JSONObject(BackupCodec.encode(Backup(listOf(category), listOf(task))))
+        old.put("version", 6).put("training", old.getJSONArray("tasks")).put("tasks", org.json.JSONArray())
+        val restored = BackupCodec.decode(old.toString())
+        assertEquals(listOf(task.trainingRecord()), restored.training)
+        assertTrue(restored.tasks.isEmpty())
+        assertFalse(JSONObject(BackupCodec.encode(restored)).getJSONArray("training").getJSONObject(0).has("title"))
+    }
+    @Test fun rejectsMalformedTrainingCountsAndDuplicateHistory() {
+        val backup = Backup(emptyList(), listOf(Task("a", "Read book", priority = 2)))
+        for (count in listOf<Any>(0, 4, "1", 1.5)) {
+            val json = JSONObject(BackupCodec.encode(backup))
+            json.getJSONArray("training").getJSONObject(0).getJSONObject("tokens").put("read", count)
+            try { BackupCodec.decode(json.toString()); fail() } catch (e: BackupException) { assertEquals("invalid", e.reason) }
+        }
+        invalid(backup.copy(training = backup.training + backup.training))
     }
     private fun invalid(backup: Backup) { try { BackupCodec.decode(BackupCodec.encode(backup)); fail("Must reject invalid backup") } catch (e: BackupException) { assertEquals("invalid", e.reason) } }
 }
