@@ -9,10 +9,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.dhianapereira.afazeres.R
+
+private const val PRIVACY_POLICY_URL =
+    "https://dhianapereira.github.io/apps/afazeres/legal/politica-de-privacidade/"
+private const val TERMS_OF_USE_URL =
+    "https://dhianapereira.github.io/apps/afazeres/legal/termos-de-uso/"
 
 internal fun settingsTitle(page: String): Int = when (page) {
     "preferences" -> R.string.preferences
@@ -39,6 +45,7 @@ internal fun SettingsContent(
     onExport: () -> Unit,
     onImport: () -> Unit,
 ) {
+    val uriHandler = LocalUriHandler.current
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -61,9 +68,12 @@ internal fun SettingsContent(
                 SettingsRow(Icons.Outlined.Download, R.string.import_data, stringResource(R.string.import_description), !busy, onImport)
             }
             "legal" -> {
-                // Enable these entries when the external document URLs are available.
-                SettingsRow(Icons.Outlined.Description, R.string.privacy_policy, "", enabled = false) {}
-                SettingsRow(Icons.Outlined.Description, R.string.terms_of_use, "", enabled = false) {}
+                SettingsRow(Icons.Outlined.Description, R.string.privacy_policy, "") {
+                    uriHandler.openUri(PRIVACY_POLICY_URL)
+                }
+                SettingsRow(Icons.Outlined.Description, R.string.terms_of_use, "") {
+                    uriHandler.openUri(TERMS_OF_USE_URL)
+                }
             }
             "about" -> {
                 Text(stringResource(R.string.about_app), style = MaterialTheme.typography.bodyLarge)
