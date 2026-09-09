@@ -57,12 +57,13 @@ fun AfazeresApp(vm: AfazeresViewModel) {
     var quickTitle by rememberSaveable { mutableStateOf("") }
     var settingsPage by rememberSaveable { mutableStateOf("main") }
     var managedCategoryId by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingTask by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var categoryFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var priorityFilter by rememberSaveable { mutableStateOf<Int?>(null) }
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
     var restoreUri by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(sheet, restoreUri) { vm.clearError() }
+    LaunchedEffect(sheet, restoreUri, editingTask) { vm.clearError() }
     val snackbar = remember { SnackbarHostState() }
     val resources = LocalResources.current
     LaunchedEffect(vm, resources) { vm.events.collect { snackbar.showSnackbar(resources.getString(it)) } }
@@ -82,7 +83,7 @@ fun AfazeresApp(vm: AfazeresViewModel) {
         }
     }
     BackHandler(selected != null || categoryFilter != null || tab != 0 || settingsPage != "main") {
-        when { selected != null -> selected = null; tab == 2 && settingsPage != "main" -> settingsPage = "main"; categoryFilter != null -> categoryFilter = null; else -> tab = 0 }
+        when { editingTask -> { if (!busy) editingTask = false }; selected != null -> selected = null; tab == 2 && settingsPage != "main" -> settingsPage = "main"; categoryFilter != null -> categoryFilter = null; else -> tab = 0 }
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -98,7 +99,10 @@ fun AfazeresApp(vm: AfazeresViewModel) {
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding), contentAlignment = Alignment.TopCenter) {
             Box(Modifier.widthIn(max = 680.dp).fillMaxSize()) {
                 when {
-                    selected != null && task != null -> Detail(task, categories, { selected = null }, { sheet = "edit" }, { vm.save(task.copy(done = !task.done)) { selected = null } }, { sheet = "delete" }, busy)
+                    selected != null && task != null && editingTask -> TaskEditor(task, categories, busy, operationError, { editingTask = false }) { updated ->
+                        vm.save(updated) { editingTask = false; if (updated.done != task.done) selected = null }
+                    }
+                    selected != null && task != null -> Detail(task, categories, { selected = null }, { editingTask = true }, { vm.save(task.copy(done = !task.done)) { selected = null } }, { sheet = "delete" }, busy)
                     else -> Column(Modifier.fillMaxSize().imePadding().padding(horizontal = 24.dp)) {
                         Row(Modifier.fillMaxWidth().heightIn(min = 88.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (tab == 2 && settingsPage != "main") IconButton(onClick = { settingsPage = "main" }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
@@ -184,9 +188,6 @@ fun AfazeresApp(vm: AfazeresViewModel) {
         }
     }
     CompositionLocalProvider(LocalOperationError provides operationError) {
-    if (sheet == "edit" && task != null) TaskEditor(task, categories, busy, { sheet = null }) { item ->
-        vm.save(item) { sheet = null }
-    }
     if (sheet == "filters") FiltersSheet(priorityFilter, categoryFilter, categories, { sheet = null }) { priority, category ->
         priorityFilter = priority
         categoryFilter = category
@@ -276,6 +277,7 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
         Surface(shape = CircleShape, color = priorityColor(task.priority).copy(alpha = .13f)) { Icon(priorityIcon(task.priority), null, Modifier.padding(20.dp).size(32.dp), tint = priorityColor(task.priority)) }
         Text(stringResource(priorityLabel(task.priority)), color = priorityColor(task.priority))
         Text(task.title, style = MaterialTheme.typography.headlineLarge)
+        Text(stringResource(if (task.done) R.string.task_completed else R.string.task_pending), color = MaterialTheme.colorScheme.onSurfaceVariant)
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .4f))
         Text(stringResource(R.string.category), color = MaterialTheme.colorScheme.onSurfaceVariant)
         categories.find { it.id == task.categoryId }?.let { CategoryBadge(it) } ?: Text(stringResource(R.string.no_category))
@@ -380,35 +382,40 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable private fun TaskEditor(task: Task, categories: List<Category>, busy: Boolean, dismiss: () -> Unit, save: (Task) -> Unit) {
-    var title by rememberSaveable { mutableStateOf(task.title) }
-    var note by rememberSaveable { mutableStateOf(task.note) }
-    var category by rememberSaveable { mutableStateOf(task.categoryId) }
-    var priority by rememberSaveable { mutableIntStateOf(task.priority) }
+@Composable
+private fun TaskEditor(task: Task, categories: List<Category>, busy: Boolean, error: Int?, dismiss: () -> Unit, save: (Task) -> Unit) {
+    var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
+    var note by rememberSaveable(task.id) { mutableStateOf(task.note) }
+    var category by rememberSaveable(task.id) { mutableStateOf(task.categoryId) }
+    var priority by rememberSaveable(task.id) { mutableIntStateOf(task.priority) }
+    var done by rememberSaveable(task.id) { mutableStateOf(task.done) }
     var attempted by rememberSaveable { mutableStateOf(false) }
-    AppSheet(R.string.edit_task, { if (!busy) dismiss() }) {
-        SheetField(title, { if (it.length <= 200) title = it }, R.string.task_title, attempted && title.isBlank())
-        run {
-            SheetField(note, { if (it.length <= 4000) note = it }, R.string.note_optional, lines = 3)
-            Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.category_optional), style = MaterialTheme.typography.titleSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                FilterChip(selected = category == null, onClick = { category = null }, label = { Text(stringResource(R.string.no_category)) })
-                categories.forEach { c ->
-                    FilterChip(selected = category == c.id, onClick = { category = c.id }, label = { Text(categoryName(c)) }, leadingIcon = { Icon(categoryIcon(c), null, Modifier.size(18.dp), tint = categoryContentColor(c)) })
-                }
+    var picker by rememberSaveable { mutableStateOf<String?>(null) }
+    val focus = LocalFocusManager.current
+    Column(
+        Modifier.fillMaxSize().imePadding().pointerInput(focus) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false)
+                val up = waitForUpOrCancellation()
+                if (up != null && !up.isConsumed) focus.clearFocus()
             }
-            Text(stringResource(R.string.priority), style = MaterialTheme.typography.titleSmall)
-            listOf(2, 1, 0, -1).forEach { value ->
-                SheetChoice(stringResource(priorityLabel(value)), priority == value, priorityIcon(value), priorityColor(value)) { priority = value }
-            }
+        }.verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = dismiss, enabled = !busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
+            Text(stringResource(R.string.edit_task), style = MaterialTheme.typography.headlineSmall)
         }
-        Spacer(Modifier.height(4.dp))
+        error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+        SheetField(title, { if (it.length <= 200) title = it }, R.string.task_title, attempted && title.isBlank())
+        SheetField(note, { if (it.length <= 4000) note = it }, R.string.note_optional, lines = 3)
+        SettingsRow(Icons.Outlined.CheckCircle, R.string.task_status, stringResource(if (done) R.string.task_completed else R.string.task_pending), !busy) { focus.clearFocus(); picker = "status" }
+        SettingsRow(Icons.Outlined.GridView, R.string.category_optional, categories.find { it.id == category }?.let { categoryName(it) } ?: stringResource(R.string.no_category), !busy) { focus.clearFocus(); picker = "category" }
+        SettingsRow(priorityIcon(priority), R.string.priority, stringResource(priorityLabel(priority)), !busy) { focus.clearFocus(); picker = "priority" }
         Button(
             onClick = {
                 attempted = true
-                if (title.isNotBlank()) save(task.copy(title = title, note = note, categoryId = category, priority = priority))
+                if (title.isNotBlank()) { focus.clearFocus(); save(task.copy(title = title, note = note, categoryId = category, priority = priority, done = done)) }
             },
             enabled = !busy,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
@@ -416,6 +423,24 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
             Icon(Icons.Outlined.Check, null, Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.save))
+        }
+    }
+    picker?.let { page ->
+        AppSheet(when (page) { "status" -> R.string.task_status; "category" -> R.string.category_optional; else -> R.string.priority }, { picker = null }) {
+            when (page) {
+                "status" -> listOf(false, true).forEach { value ->
+                    SheetChoice(stringResource(if (value) R.string.task_completed else R.string.task_pending), done == value, if (value) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked) { done = value; picker = null }
+                }
+                "category" -> {
+                    SheetChoice(stringResource(R.string.no_category), category == null, Icons.Outlined.Remove) { category = null; picker = null }
+                    categories.forEach { item ->
+                        SheetChoice(categoryName(item), category == item.id, categoryIcon(item), categoryContentColor(item)) { category = item.id; picker = null }
+                    }
+                }
+                else -> listOf(2, 1, 0, -1).forEach { value ->
+                    SheetChoice(stringResource(priorityLabel(value)), priority == value, priorityIcon(value), priorityColor(value)) { priority = value; picker = null }
+                }
+            }
         }
     }
 }

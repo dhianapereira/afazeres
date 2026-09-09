@@ -117,4 +117,7 @@
     <string name="icon_pet">Animal</string>
     <string name="icon_star">Estrela</string>
     <string name="icon_leaf">Folha</string>
+    <string name="task_status">Status</string>
+    <string name="task_completed">Concluído</string>
+    <string name="task_pending">Pendente</string>
 </resources>

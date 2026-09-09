@@ -116,4 +116,7 @@
     <string name="icon_pet">Pet</string>
     <string name="icon_star">Star</string>
     <string name="icon_leaf">Leaf</string>
+    <string name="task_status">Status</string>
+    <string name="task_completed">Completed</string>
+    <string name="task_pending">Pending</string>
 </resources>

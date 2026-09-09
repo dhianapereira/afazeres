@@ -63,4 +63,36 @@ class DatabaseTest {
         assertTrue(repo.snapshot().categories.isEmpty())
         assertEquals(1, repo.snapshot().tasks.size)
     }
+    @Test fun taskLifecyclePreservesFieldsAndSupportsClearingOptionalValues() = runTest {
+        val repo = TaskRepository(db)
+        val original = Task("task", "Title", createdAt = 100, updatedAt = 100)
+        repo.save(original)
+        assertEquals(original, repo.tasks.first().single())
+        val category = Category("c", "Category")
+        repo.save(category)
+        val edited = original.copy(title = "Edited", note = "Description", categoryId = category.id, priority = 2, updatedAt = 200)
+        repo.save(edited)
+        assertEquals(edited, repo.tasks.first().single())
+        repo.save(edited.copy(done = true))
+        assertTrue(repo.tasks.first().filterNot { it.done }.isEmpty())
+        assertEquals(edited.copy(done = true), repo.tasks.first().filter { it.done }.single())
+        val reopened = edited.copy(done = false, note = "", categoryId = null, priority = -1)
+        repo.save(reopened)
+        assertTrue(repo.tasks.first().filter { it.done }.isEmpty())
+        assertEquals(reopened, repo.tasks.first().filterNot { it.done }.single())
+        repo.delete(reopened)
+        assertTrue(repo.tasks.first().isEmpty())
+        assertEquals(category, repo.snapshot().categories.single())
+    }
+    @Test fun invalidTaskEditsLeaveStoredTaskIntact() = runTest {
+        val repo = TaskRepository(db)
+        val original = Task("task", "Keep me")
+        repo.save(original)
+        for (invalid in listOf(original.copy(title = " "), original.copy(priority = 3))) {
+            try { repo.save(invalid); fail("Invalid task must be rejected") } catch (_: IllegalArgumentException) { }
+            assertEquals(original, repo.tasks.first().single())
+        }
+        try { repo.save(original.copy(categoryId = "missing")); fail("Missing category must be rejected") } catch (_: android.database.sqlite.SQLiteConstraintException) { }
+        assertEquals(original, repo.tasks.first().single())
+    }
 }

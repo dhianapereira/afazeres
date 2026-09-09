@@ -2,6 +2,7 @@ package io.github.dhianapereira.afazeres.data
 
 import androidx.room.*
 import io.github.dhianapereira.afazeres.model.CategoryAppearance
+import io.github.dhianapereira.afazeres.model.TaskRules
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "categories")
@@ -27,7 +28,7 @@ abstract class AfazeresDatabase : RoomDatabase() { abstract fun dao(): AfazeresD
 class TaskRepository(private val db: AfazeresDatabase) {
     val tasks = db.dao().tasks()
     val categories = db.dao().categories()
-    suspend fun save(task: Task) { require(task.title.isNotBlank() && task.title.length <= 200 && task.note.length <= 4000); db.dao().save(task) }
+    suspend fun save(task: Task) { require(TaskRules.valid(task.title, task.note, task.priority)); db.dao().save(task) }
     suspend fun save(category: Category) { require(category.name.isNotBlank() && category.name.length <= 60 && CategoryAppearance.validColor(category.color) && category.icon in CategoryAppearance.icons); db.dao().save(category) }
     suspend fun delete(task: Task) = db.dao().delete(task)
     suspend fun delete(category: Category) = db.withTransaction {

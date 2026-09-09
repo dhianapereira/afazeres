@@ -7,7 +7,8 @@ O Afazeres permite anotar uma tarefa diretamente na tela inicial e adicionar os 
 ## Funcionalidades
 
 - Cadastro rápido de afazeres pelo campo da tela inicial, com envio pelo botão + ou pelo teclado.
-- Edição, exclusão, conclusão e reabertura de afazeres.
+- Edição de afazeres em página própria, com título obrigatório e status pendente ou concluído.
+- Exclusão, conclusão e reabertura de afazeres.
 - Descrição, categoria e prioridade opcionais.
 - Ordenação por prioridade: alta, média, baixa e sem prioridade.
 - Filtros combinados por prioridade e categoria, acessíveis por um botão na tela inicial.
