@@ -127,4 +127,51 @@
     <plurals name="selected_tasks"><item quantity="one">%d selected</item><item quantity="other">%d selected</item></plurals>
     <plurals name="delete_tasks_confirmation"><item quantity="one">Permanently delete %d selected task? This action cannot be undone.</item><item quantity="other">Permanently delete %d selected tasks? This action cannot be undone.</item></plurals>
     <string name="complete_selected">Complete</string>
+    <string name="category_automatic">Category filled automatically</string>
+    <string name="priority_automatic">Priority filled automatically</string>
+    <string name="automatic_edit_hint">Some fields were filled automatically. Select the category or priority to confirm or correct it and help the app learn.</string>
+    <string name="learning">Local learning</string>
+    <string name="learning_description">Examples, simulation and model controls</string>
+    <string name="category_examples">Category examples</string>
+    <string name="priority_examples">Priority examples</string>
+    <string name="automatic_classification">Automatic classification</string>
+    <string name="automatic_classification_hint">Fill category and priority for new tasks. Turning this off does not stop learning from manual choices.</string>
+    <string name="learning_how">The model uses task titles and manual choices, including archived or deleted tasks. Training history is retained until you reset it. Each field needs at least 8 examples and 2 distinct values, plus enough evidence to predict.</string>
+    <string name="simulate_learning">Simulate classification</string>
+    <string name="simulate_hint">Analyze a title with the current model without creating tasks or training. The result may differ from an earlier prediction.</string>
+    <string name="simulate_disabled_hint">Automatic classification is off. You can still run this simulation.</string>
+    <string name="simulate_title">Title to analyze</string>
+    <string name="analyze_title">Analyze title</string>
+    <string name="reset_learning">Reset learning</string>
+    <string name="confirm_reset_learning">Reset selected training data</string>
+    <string name="reset_learning_confirmation">Current examples for the selected fields will stop training the model. Task titles, categories and priorities will be preserved. New manual choices will start a new history.</string>
+    <string name="learning_both">Category and priority</string>
+    <string name="training_examples_hint">These are the examples used by the current model. Open a task to correct a choice. Unconfirmed predictions, reset examples and titles without usable words are excluded.</string>
+    <string name="no_training_examples">No training examples available for this field.</string>
+    <string name="view_training_task">View task</string>
+    <string name="no_prediction">No prediction</string>
+    <string name="recognized_words">Recognized words: %1$s</string>
+    <string name="no_recognized_words">none</string>
+    <string name="reason_no_words">The title has no usable words after normalization.</string>
+    <string name="reason_few_examples">This field does not yet have the required 8 examples.</string>
+    <string name="reason_single_label">Examples of at least 2 distinct values are needed for comparison.</string>
+    <string name="reason_unknown_words">None of the title words appear in this field’s examples.</string>
+    <string name="reason_low_coverage">Fewer than 60% of the title words are known to the model.</string>
+    <string name="reason_weak_support">Fewer than 3 similar examples support the prediction.</string>
+    <string name="reason_weak_evidence">The words do not distinguish the possible values clearly enough.</string>
+    <string name="reason_low_score">The result did not meet the minimum criteria for filling this field.</string>
+    <string name="reason_accepted">The history and words meet the current classification criteria. This does not guarantee that the prediction is correct.</string>
+    <plurals name="training_examples"><item quantity="one">%d example</item><item quantity="other">%d examples</item></plurals>
+    <string name="previous_page">Previous page</string>
+    <string name="next_page">Next page</string>
+    <string name="page_position">Page %1$d of %2$d</string>
+    <string name="pending_total">Pending tasks: %1$d</string>
+    <string name="clear_page_selection">Deselect page</string>
+    <string name="expand_group">Expand group</string>
+    <string name="collapse_group">Collapse group</string>
+    <string name="training_task_deleted">Deleted task · learning preserved</string>
+    <string name="delete_and_forget">Delete and forget learning</string>
+    <string name="delete_learning_hint">Deleting keeps word statistics for learning, but not the original text. To also remove this contribution, choose delete and forget.</string>
+    <plurals name="deleted_training_examples"><item quantity="one">%d example from a deleted task</item><item quantity="other">%d examples from deleted tasks</item></plurals>
+    <string name="view_archived_training_task">Archived · View task</string>
 </resources>

@@ -20,8 +20,14 @@ internal fun settingsTitle(page: String): Int = when (page) {
     "legal" -> R.string.legal
     "about" -> R.string.about
     "archived" -> R.string.archived
+    "learning" -> R.string.learning
+    "learning_categories" -> R.string.category_examples
+    "learning_priorities" -> R.string.priority_examples
+    "learning_simulate" -> R.string.simulate_learning
     else -> R.string.settings
 }
+
+internal fun settingsParent(page: String) = if (page.startsWith("learning_")) "learning" else "main"
 
 @Composable
 internal fun SettingsContent(
@@ -42,6 +48,7 @@ internal fun SettingsContent(
                 SettingsRow(Icons.Outlined.Tune, R.string.preferences, stringResource(R.string.preferences_description)) { onPage("preferences") }
                 SettingsRow(Icons.Outlined.Folder, R.string.data_and_backup, stringResource(R.string.backup_description)) { onPage("data") }
                 SettingsRow(Icons.Outlined.Archive, R.string.archived, stringResource(R.string.archived_description)) { onPage("archived") }
+                SettingsRow(Icons.Outlined.Psychology, R.string.learning, stringResource(R.string.learning_description)) { onPage("learning") }
                 SettingsRow(Icons.Outlined.Gavel, R.string.legal, stringResource(R.string.legal_description)) { onPage("legal") }
                 SettingsRow(Icons.Outlined.Info, R.string.about, stringResource(R.string.about_description)) { onPage("about") }
             }

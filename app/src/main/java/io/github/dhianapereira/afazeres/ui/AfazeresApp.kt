@@ -53,6 +53,9 @@ fun AfazeresApp(vm: AfazeresViewModel) {
     val busy by vm.busy.collectAsStateWithLifecycle()
     val operationError by vm.operationError.collectAsStateWithLifecycle()
     val theme by vm.theme.collectAsStateWithLifecycle()
+    val automaticClassification by vm.automaticClassification.collectAsStateWithLifecycle()
+    val training by vm.training.collectAsStateWithLifecycle()
+    val analysis by vm.analysis.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var quickTitle by rememberSaveable { mutableStateOf("") }
     var settingsPage by rememberSaveable { mutableStateOf("main") }
@@ -74,7 +77,7 @@ fun AfazeresApp(vm: AfazeresViewModel) {
     val addTask: () -> Unit = {
         if (!busy && quickTitle.isNotBlank()) {
             val submittedTitle = quickTitle
-            vm.save(Task(UUID.randomUUID().toString(), submittedTitle.trim())) {
+            vm.create(Task(UUID.randomUUID().toString(), submittedTitle.trim())) {
                 if (quickTitle == submittedTitle) quickTitle = ""
                 priorityFilter = null
                 categoryFilter = null
@@ -83,7 +86,7 @@ fun AfazeresApp(vm: AfazeresViewModel) {
         }
     }
     BackHandler(selected != null || categoryFilter != null || tab != 0 || settingsPage != "main") {
-        when { editingTask -> { if (!busy) editingTask = false }; selected != null -> selected = null; tab == 2 && settingsPage != "main" -> settingsPage = "main"; categoryFilter != null -> categoryFilter = null; else -> tab = 0 }
+        when { editingTask -> { if (!busy) editingTask = false }; selected != null -> selected = null; tab == 2 && settingsPage != "main" -> settingsPage = settingsParent(settingsPage); categoryFilter != null -> categoryFilter = null; else -> tab = 0 }
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -99,13 +102,13 @@ fun AfazeresApp(vm: AfazeresViewModel) {
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding), contentAlignment = Alignment.TopCenter) {
             Box(Modifier.widthIn(max = 680.dp).fillMaxSize()) {
                 when {
-                    selected != null && task != null && editingTask -> TaskEditor(task, categories, busy, operationError, { editingTask = false }) { updated ->
-                        vm.save(updated) { editingTask = false; if (updated.done != task.done) selected = null }
+                    selected != null && task != null && editingTask -> TaskEditor(task, categories, busy, operationError, { editingTask = false }) { updated, confirmCategory, confirmPriority ->
+                        vm.save(updated, confirmCategory, confirmPriority) { editingTask = false; if (updated.done != task.done) selected = null }
                     }
                     selected != null && task != null -> Detail(task, categories, { selected = null }, { editingTask = true }, { vm.save(task.copy(done = !task.done)) { selected = null } }, { sheet = "delete" }, busy)
                     else -> Column(Modifier.fillMaxSize().imePadding().padding(horizontal = 24.dp)) {
                         Row(Modifier.fillMaxWidth().heightIn(min = 88.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (tab == 2 && settingsPage != "main") IconButton(onClick = { settingsPage = "main" }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
+                            if (tab == 2 && settingsPage != "main") IconButton(onClick = { settingsPage = settingsParent(settingsPage) }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
                             if (tab == 1 && categoryFilter != null) IconButton(onClick = { categoryFilter = null }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
                             Text(if (tab == 1 && categoryFilter != null) categories.find { it.id == categoryFilter }?.let { categoryName(it) }.orEmpty() else if (tab == 2) stringResource(settingsTitle(settingsPage)) else stringResource(listOf(R.string.app_name, R.string.categories, R.string.settings)[tab]), Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Medium)
                             if (tab == 0 || tab == 1 && categoryFilter != null) {
@@ -143,6 +146,12 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                                 )
                                 Spacer(Modifier.height(16.dp))
                                 val filtered = tasks.filter { !it.done && (priorityFilter == null || it.priority == priorityFilter) && (categoryFilter == null || it.categoryId == categoryFilter) }
+                                Text(
+                                    stringResource(R.string.pending_total, tasks.count { !it.done }),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
                                 key(tab, categoryFilter, priorityFilter) {
                                     TaskList(
                                         tasks = filtered, categories = categories, busy = busy, error = operationError,
@@ -152,8 +161,14 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                                 }
                             }
                             tab == 1 && categories.isEmpty() -> EmptyState(R.string.empty_categories)
-                            tab == 1 -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                                items(categories, key = { it.id }) { category ->
+                            tab == 1 -> {
+                                var categoryPage by rememberSaveable { mutableStateOf(0) }
+                                LaunchedEffect(categories.size) { categoryPage = validPage(categoryPage, categories.size) }
+                                val categoryListState = androidx.compose.foundation.lazy.rememberLazyListState()
+                                LaunchedEffect(categoryPage) { categoryListState.scrollToItem(0) }
+                                LazyColumn(state = categoryListState, verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                                item { Pagination(categoryPage, categories.size) { categoryPage = it } }
+                                items(pageItems(categories, categoryPage), key = { it.id }) { category ->
                                     Surface(onClick = { categoryFilter = category.id; priorityFilter = null }, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
                                         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                             CategoryIcon(category)
@@ -166,6 +181,7 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                                     }
                                 }
                             }
+                            }
                             tab == 2 && settingsPage == "archived" -> {
                                 TaskList(
                                     tasks = tasks.filter { it.done }, categories = categories, busy = busy, error = operationError,
@@ -173,6 +189,13 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                                     open = { selected = it }, changeStatus = vm::reopenArchived, delete = vm::deleteArchived,
                                 )
                             }
+                            tab == 2 && settingsPage.startsWith("learning") -> LearningScreen(
+                                page = settingsPage, categories = categories, training = training,
+                                automatic = automaticClassification, busy = busy, error = operationError, analysis = analysis,
+                                onPage = { settingsPage = it }, onTask = { selected = it },
+                                onToggle = vm::automaticClassification, onAnalyze = vm::analyze, onClearAnalysis = vm::clearAnalysis,
+                                onReset = vm::resetLearning,
+                            )
                             else -> SettingsContent(
                                 page = settingsPage,
                                 theme = theme,
@@ -230,6 +253,8 @@ fun AfazeresApp(vm: AfazeresViewModel) {
     if (sheet == "delete" && task != null) AppSheet(R.string.delete_task, { if (!busy) sheet = null }) {
         Text(stringResource(R.string.delete_confirmation))
         Button(onClick = { vm.delete(task) { selected = null; sheet = null } }, enabled = !busy, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.delete_task)) }
+        Text(stringResource(R.string.delete_learning_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = { vm.delete(task, true) { selected = null; sheet = null } }, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(stringResource(R.string.delete_and_forget)) }
         TextButton(onClick = { sheet = null }, enabled = !busy) { Text(stringResource(R.string.cancel)) }
     }
     restoreUri?.let { uri -> AppSheet(R.string.import_data, { if (!busy) restoreUri = null }) {
@@ -278,11 +303,13 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
         }
         Surface(shape = CircleShape, color = priorityColor(task.priority).copy(alpha = .13f)) { Icon(priorityIcon(task.priority), null, Modifier.padding(20.dp).size(32.dp), tint = priorityColor(task.priority)) }
         Text(stringResource(priorityLabel(task.priority)), color = priorityColor(task.priority))
+        if (task.priority >= 0 && !task.priorityConfirmed) Text(stringResource(R.string.priority_automatic), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(task.title, style = MaterialTheme.typography.headlineLarge)
         Text(stringResource(if (task.done) R.string.task_completed else R.string.task_pending), color = MaterialTheme.colorScheme.onSurfaceVariant)
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .4f))
         Text(stringResource(R.string.category), color = MaterialTheme.colorScheme.onSurfaceVariant)
         categories.find { it.id == task.categoryId }?.let { CategoryBadge(it) } ?: Text(stringResource(R.string.no_category))
+        if (task.categoryId != null && !task.categoryConfirmed) Text(stringResource(R.string.category_automatic), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .4f))
         Text(stringResource(R.string.note_label), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(task.note.ifBlank { stringResource(R.string.no_note) })
@@ -385,11 +412,15 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
 }
 
 @Composable
-private fun TaskEditor(task: Task, categories: List<Category>, busy: Boolean, error: Int?, dismiss: () -> Unit, save: (Task) -> Unit) {
+private fun TaskEditor(task: Task, categories: List<Category>, busy: Boolean, error: Int?, dismiss: () -> Unit, save: (Task, Boolean, Boolean) -> Unit) {
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
     var note by rememberSaveable(task.id) { mutableStateOf(task.note) }
     var category by rememberSaveable(task.id) { mutableStateOf(task.categoryId) }
     var priority by rememberSaveable(task.id) { mutableIntStateOf(task.priority) }
+    var categoryTouched by rememberSaveable(task.id) { mutableStateOf(false) }
+    var priorityTouched by rememberSaveable(task.id) { mutableStateOf(false) }
+    var categoryConfirmed by rememberSaveable(task.id) { mutableStateOf(task.categoryConfirmed) }
+    var priorityConfirmed by rememberSaveable(task.id) { mutableStateOf(task.priorityConfirmed) }
     var done by rememberSaveable(task.id) { mutableStateOf(task.done) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var picker by rememberSaveable { mutableStateOf<String?>(null) }
@@ -409,6 +440,9 @@ private fun TaskEditor(task: Task, categories: List<Category>, busy: Boolean, er
             Text(stringResource(R.string.edit_task), style = MaterialTheme.typography.headlineSmall)
         }
         error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+        if ((category != null && !categoryConfirmed) || (priority >= 0 && !priorityConfirmed)) {
+            Text(stringResource(R.string.automatic_edit_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         SheetField(title, { if (it.length <= 200) title = it }, R.string.task_title, attempted && title.isBlank())
         SheetField(note, { if (it.length <= 4000) note = it }, R.string.note_optional, lines = 3)
         SettingsRow(Icons.Outlined.CheckCircle, R.string.task_status, stringResource(if (done) R.string.task_completed else R.string.task_pending), !busy) { focus.clearFocus(); picker = "status" }
@@ -417,7 +451,7 @@ private fun TaskEditor(task: Task, categories: List<Category>, busy: Boolean, er
         Button(
             onClick = {
                 attempted = true
-                if (title.isNotBlank()) { focus.clearFocus(); save(task.copy(title = title, note = note, categoryId = category, priority = priority, done = done)) }
+                if (title.isNotBlank()) { focus.clearFocus(); save(task.copy(title = title, note = note, categoryId = category, priority = priority, done = done, categoryConfirmed = categoryConfirmed, priorityConfirmed = priorityConfirmed), categoryTouched, priorityTouched) }
             },
             enabled = !busy,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
@@ -434,13 +468,13 @@ private fun TaskEditor(task: Task, categories: List<Category>, busy: Boolean, er
                     SheetChoice(stringResource(if (value) R.string.task_completed else R.string.task_pending), done == value, if (value) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked) { done = value; picker = null }
                 }
                 "category" -> {
-                    SheetChoice(stringResource(R.string.no_category), category == null, Icons.Outlined.Remove) { category = null; picker = null }
+                    SheetChoice(stringResource(R.string.no_category), category == null, Icons.Outlined.Remove) { category = null; categoryConfirmed = true; categoryTouched = true; picker = null }
                     categories.forEach { item ->
-                        SheetChoice(categoryName(item), category == item.id, categoryIcon(item), categoryContentColor(item)) { category = item.id; picker = null }
+                        SheetChoice(categoryName(item), category == item.id, categoryIcon(item), categoryContentColor(item)) { category = item.id; categoryConfirmed = true; categoryTouched = true; picker = null }
                     }
                 }
                 else -> listOf(2, 1, 0, -1).forEach { value ->
-                    SheetChoice(stringResource(priorityLabel(value)), priority == value, priorityIcon(value), priorityColor(value)) { priority = value; picker = null }
+                    SheetChoice(stringResource(priorityLabel(value)), priority == value, priorityIcon(value), priorityColor(value)) { priority = value; priorityConfirmed = true; priorityTouched = true; picker = null }
                 }
             }
         }

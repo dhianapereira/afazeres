@@ -128,4 +128,51 @@
     <plurals name="selected_tasks"><item quantity="one">%d selecionado</item><item quantity="other">%d selecionados</item></plurals>
     <plurals name="delete_tasks_confirmation"><item quantity="one">Excluir permanentemente %d afazer selecionado? Essa ação não pode ser desfeita.</item><item quantity="other">Excluir permanentemente %d afazeres selecionados? Essa ação não pode ser desfeita.</item></plurals>
     <string name="complete_selected">Concluir</string>
+    <string name="category_automatic">Categoria preenchida automaticamente</string>
+    <string name="priority_automatic">Prioridade preenchida automaticamente</string>
+    <string name="automatic_edit_hint">Há campos preenchidos automaticamente. Selecione a categoria ou a prioridade para confirmar ou corrigir e ajudar o app a aprender.</string>
+    <string name="learning">Aprendizado local</string>
+    <string name="learning_description">Exemplos, simulação e controles do modelo</string>
+    <string name="category_examples">Exemplos de categoria</string>
+    <string name="priority_examples">Exemplos de prioridade</string>
+    <string name="automatic_classification">Preenchimento automático</string>
+    <string name="automatic_classification_hint">Preencher categoria e prioridade de novas tarefas. Desativar não impede o aprendizado com escolhas manuais.</string>
+    <string name="learning_how">O modelo usa os títulos e as escolhas manuais das tarefas, inclusive arquivadas ou removidas. O histórico de treinamento é preservado até você reiniciá-lo. Cada campo precisa de pelo menos 8 exemplos e 2 valores diferentes, além de evidência suficiente para prever.</string>
+    <string name="simulate_learning">Simular classificação</string>
+    <string name="simulate_hint">Analise um título com o modelo atual, sem criar tarefas ou treinar. O resultado pode ser diferente de uma previsão anterior.</string>
+    <string name="simulate_disabled_hint">O preenchimento automático está desativado. Esta simulação continua disponível.</string>
+    <string name="simulate_title">Título para simulação</string>
+    <string name="analyze_title">Analisar título</string>
+    <string name="reset_learning">Reiniciar aprendizado</string>
+    <string name="confirm_reset_learning">Reiniciar exemplos selecionados</string>
+    <string name="reset_learning_confirmation">Os exemplos atuais dos campos escolhidos deixarão de treinar o modelo. Os títulos, categorias e prioridades das tarefas serão preservados. Novas escolhas manuais iniciarão um novo histórico.</string>
+    <string name="learning_both">Categoria e prioridade</string>
+    <string name="training_examples_hint">Estes são os exemplos usados pelo modelo atual. Abra uma tarefa para corrigir a escolha. Previsões não confirmadas, exemplos reiniciados e títulos sem palavras úteis ficam de fora.</string>
+    <string name="no_training_examples">Nenhum exemplo disponível para este campo.</string>
+    <string name="view_training_task">Ver tarefa</string>
+    <string name="no_prediction">Sem previsão</string>
+    <string name="recognized_words">Palavras reconhecidas: %1$s</string>
+    <string name="no_recognized_words">nenhuma</string>
+    <string name="reason_no_words">O título não contém palavras úteis após a normalização.</string>
+    <string name="reason_few_examples">Este campo ainda não tem os 8 exemplos necessários.</string>
+    <string name="reason_single_label">É preciso ter exemplos de pelo menos 2 valores diferentes para comparar.</string>
+    <string name="reason_unknown_words">Nenhuma palavra do título aparece nos exemplos deste campo.</string>
+    <string name="reason_low_coverage">Menos de 60% das palavras do título são conhecidas pelo modelo.</string>
+    <string name="reason_weak_support">Há menos de 3 exemplos semelhantes apoiando a previsão.</string>
+    <string name="reason_weak_evidence">As palavras não diferenciam suficientemente os valores possíveis.</string>
+    <string name="reason_low_score">O resultado não atingiu os critérios mínimos para preencher o campo.</string>
+    <string name="reason_accepted">O histórico e as palavras atendem aos critérios atuais de preenchimento. Isso não garante que a previsão esteja correta.</string>
+    <plurals name="training_examples"><item quantity="one">%d exemplo</item><item quantity="other">%d exemplos</item></plurals>
+    <string name="previous_page">Página anterior</string>
+    <string name="next_page">Próxima página</string>
+    <string name="page_position">Página %1$d de %2$d</string>
+    <string name="pending_total">Afazeres pendentes: %1$d</string>
+    <string name="clear_page_selection">Desmarcar página</string>
+    <string name="expand_group">Expandir grupo</string>
+    <string name="collapse_group">Recolher grupo</string>
+    <string name="training_task_deleted">Tarefa removida · aprendizado preservado</string>
+    <string name="delete_and_forget">Excluir e esquecer aprendizado</string>
+    <string name="delete_learning_hint">Excluir mantém as estatísticas de palavras para o aprendizado, mas não o texto original. Para remover também essa contribuição, escolha excluir e esquecer.</string>
+    <plurals name="deleted_training_examples"><item quantity="one">%d exemplo de tarefa removida</item><item quantity="other">%d exemplos de tarefas removidas</item></plurals>
+    <string name="view_archived_training_task">Arquivada · Ver tarefa</string>
 </resources>

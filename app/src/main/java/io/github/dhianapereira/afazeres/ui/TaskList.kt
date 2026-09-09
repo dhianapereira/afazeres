@@ -30,19 +30,25 @@ internal fun TaskList(
     archived: Boolean, emptyLabel: Int,
     open: (String) -> Unit,
     changeStatus: (List<String>, () -> Unit) -> Unit,
-    delete: (List<String>, () -> Unit) -> Unit,
+    delete: (List<String>, Boolean, () -> Unit) -> Unit,
 ) {
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
     var selecting by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
+    var page by rememberSaveable { mutableStateOf(0) }
+    val visibleTasks = pageItems(tasks, page)
+    val pageIds = visibleTasks.map { it.id }
     val ids = tasks.map { it.id }
     val current = TaskSelection.current(selected, ids)
+    LaunchedEffect(tasks.size) { page = validPage(page, tasks.size) }
+    LaunchedEffect(page) { listState.scrollToItem(0) }
     val finish = { selecting = false; selected = emptyList<String>(); confirmingDelete = false }
     BackHandler(selecting && !confirmingDelete) { if (!busy) finish() }
     LaunchedEffect(selecting) { if (selecting) listState.animateScrollToItem(0) }
     LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item { Pagination(page, tasks.size, !busy) { page = it } }
         if (selecting || archived) item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -57,10 +63,10 @@ internal fun TaskList(
         }
         if (selecting) {
             item {
-                TextButton(onClick = { selected = if (current.size == ids.size) emptyList() else ids }, enabled = !busy && ids.isNotEmpty()) {
+                TextButton(onClick = { selected = if (pageIds.all { it in current }) current - pageIds.toSet() else (current + pageIds).distinct() }, enabled = !busy && ids.isNotEmpty()) {
                     Icon(Icons.Outlined.Checklist, null)
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(if (current.size == ids.size) R.string.clear_selection else R.string.select_all))
+                    Text(stringResource(if (pageIds.all { it in current }) R.string.clear_page_selection else R.string.select_all))
                 }
                 Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = { changeStatus(current, finish) }, enabled = !busy && current.isNotEmpty(), modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp)) {
@@ -74,7 +80,7 @@ internal fun TaskList(
             }
         }
         if (tasks.isEmpty()) item { Text(stringResource(emptyLabel), Modifier.padding(vertical = 36.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        items(tasks, key = { it.id }) { task ->
+        items(visibleTasks, key = { it.id }) { task ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (selecting) Checkbox(modifier = Modifier.semantics { contentDescription = task.title }, checked = task.id in current, enabled = !busy, onCheckedChange = { selected = TaskSelection.toggle(current, task.id) })
                 Box(Modifier.weight(1f)) {
@@ -88,12 +94,17 @@ internal fun TaskList(
                 }
             }
         }
+        item { Pagination(page, tasks.size, !busy) { page = it } }
     }
     if (confirmingDelete) AppSheet(R.string.delete_selected, { if (!busy) confirmingDelete = false }) {
         Text(pluralStringResource(R.plurals.delete_tasks_confirmation, current.size, current.size))
         error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-        Button(onClick = { delete(current, finish) }, enabled = !busy && current.isNotEmpty(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+        Button(onClick = { delete(current, false, finish) }, enabled = !busy && current.isNotEmpty(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
             Text(stringResource(R.string.delete_selected), textAlign = TextAlign.Center)
+        }
+        Text(stringResource(R.string.delete_learning_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = { delete(current, true, finish) }, enabled = !busy && current.isNotEmpty(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+            Text(stringResource(R.string.delete_and_forget), textAlign = TextAlign.Center)
         }
         TextButton(onClick = { confirmingDelete = false }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
     }
