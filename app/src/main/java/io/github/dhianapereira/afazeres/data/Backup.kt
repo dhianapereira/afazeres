@@ -8,9 +8,19 @@ import org.json.JSONObject
 class BackupException(val reason: String) : IllegalArgumentException(reason)
 object BackupCodec {
     const val MAX_BYTES = 5 * 1024 * 1024
-    fun encode(backup: Backup): String = JSONObject().put("format", "afazeres").put("version", 3)
+    private const val MAX_CATEGORIES = 1000
+    private const val MAX_TASKS = 10000
+    fun encode(backup: Backup): String {
+        checkCounts(backup.categories.size, backup.tasks.size)
+        val text = JSONObject().put("format", "afazeres").put("version", 3)
         .put("categories", JSONArray().apply { backup.categories.forEach { put(JSONObject().put("id", it.id).put("name", it.name).put("color", it.color).put("builtIn", it.builtIn).put("icon", it.icon)) } })
         .put("tasks", JSONArray().apply { backup.tasks.forEach { put(JSONObject().put("id", it.id).put("title", it.title).put("note", it.note).put("categoryId", it.categoryId ?: JSONObject.NULL).put("priority", it.priority).put("done", it.done).put("createdAt", it.createdAt).put("updatedAt", it.updatedAt)) } }).toString(2)
+        if (text.toByteArray().size > MAX_BYTES) throw BackupException("large")
+        return text
+    }
+    private fun checkCounts(categories: Int, tasks: Int) {
+        if (categories > MAX_CATEGORIES || tasks > MAX_TASKS) throw BackupException("large")
+    }
     fun decode(text: String): Backup {
         if (text.isBlank()) throw BackupException("empty")
         if (text.toByteArray().size > MAX_BYTES) throw BackupException("large")
@@ -20,7 +30,7 @@ object BackupCodec {
             val version = root.getInt("version")
             if (version !in 1..3) throw BackupException("version")
             val cs = root.getJSONArray("categories"); val ts = root.getJSONArray("tasks")
-            if (cs.length() > 1000 || ts.length() > 10000) throw BackupException("large")
+            checkCounts(cs.length(), ts.length())
             val categories = List(cs.length()) { i ->
                 val item = cs.getJSONObject(i)
                 require(item.get("color") is Int || item.get("color") is Long)

@@ -57,5 +57,23 @@ class BackupCodecTest {
         json.getJSONArray("categories").getJSONObject(0).put("color", 100)
         try { BackupCodec.decode(json.toString()); fail() } catch (e: BackupException) { assertEquals("invalid", e.reason) }
     }
+    @Test fun exportRejectsCountsThatCannotBeImported() {
+        for (backup in listOf(
+            Backup(List(1001) { category.copy(id = "c$it", builtIn = false) }, emptyList()),
+            Backup(emptyList(), List(10001) { Task("t$it", "Title") }),
+        )) {
+            try { BackupCodec.encode(backup); fail("Must reject oversized export") }
+            catch (e: BackupException) { assertEquals("large", e.reason) }
+        }
+    }
+    @Test fun exportAcceptsImportableCountBoundary() {
+        val backup = Backup(emptyList(), List(10000) { Task("t$it", "Title") })
+        assertEquals(backup, BackupCodec.decode(BackupCodec.encode(backup)))
+    }
+    @Test fun exportRejectsOversizePayloadBeforeWriting() {
+        val backup = Backup(emptyList(), List(1500) { Task("t$it", "Title", note = "x".repeat(4000)) })
+        try { BackupCodec.encode(backup); fail("Must reject oversized payload") }
+        catch (e: BackupException) { assertEquals("large", e.reason) }
+    }
     private fun invalid(backup: Backup) { try { BackupCodec.decode(BackupCodec.encode(backup)); fail("Must reject invalid backup") } catch (e: BackupException) { assertEquals("invalid", e.reason) } }
 }

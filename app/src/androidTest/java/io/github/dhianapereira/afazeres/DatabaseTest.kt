@@ -156,4 +156,16 @@ class DatabaseTest {
         repo.deletePending(listOf("a", "b", "archived", "missing"))
         assertEquals(setOf("keep", "archived"), repo.snapshot().tasks.map { it.id }.toSet())
     }
+    @Test fun backupRoundTripRestoresPendingAndArchivedTasksWithCustomCategories() = runTest {
+        val repo = TaskRepository(db)
+        val category = Category("custom", "Custom", 0xFF123456L, icon = "pet")
+        repo.save(category)
+        repo.save(Task("pending", "Pending", "Description", category.id, 2, false, 100, 200))
+        repo.save(Task("archived", "Archived", done = true, createdAt = 100, updatedAt = 300))
+        val original = repo.snapshot()
+        val exported = BackupCodec.encode(original)
+        repo.save(Task("later", "Added after export"))
+        repo.restore(BackupCodec.decode(exported))
+        assertEquals(original, repo.snapshot())
+    }
 }

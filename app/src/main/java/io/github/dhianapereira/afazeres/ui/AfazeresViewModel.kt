@@ -47,7 +47,6 @@ class AfazeresViewModel(application: Application) : AndroidViewModel(application
     fun theme(value: String) = perform { app.preferences.theme(value) }
     fun export(uri: Uri) = perform {
         val text = BackupCodec.encode(repository.snapshot())
-        require(text.toByteArray().size <= BackupCodec.MAX_BYTES)
         app.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(text) } ?: error("output")
         messages.send(R.string.export_success)
     }
