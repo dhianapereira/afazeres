@@ -95,4 +95,65 @@ class DatabaseTest {
         try { repo.save(original.copy(categoryId = "missing")); fail("Missing category must be rejected") } catch (_: android.database.sqlite.SQLiteConstraintException) { }
         assertEquals(original, repo.tasks.first().single())
     }
+    @Test fun bulkReopenPreservesDetailsAndLeavesUnselectedTasksUntouched() = runTest {
+        val repo = TaskRepository(db)
+        val a = Task("a", "A", note = "Description", priority = 2, done = true, createdAt = 100, updatedAt = 100)
+        val b = a.copy(id = "b")
+        val unselected = a.copy(id = "unselected")
+        val active = a.copy(id = "active", done = false)
+        listOf(a, b, unselected, active).forEach { repo.save(it) }
+        repo.reopenArchived(listOf("a", "b", "active", "missing"))
+        val stored = repo.snapshot().tasks.associateBy { it.id }
+        for (original in listOf(a, b)) {
+            val reopened = stored.getValue(original.id)
+            assertFalse(reopened.done)
+            assertTrue(reopened.updatedAt > original.updatedAt)
+            assertEquals(original.copy(done = false, updatedAt = reopened.updatedAt), reopened)
+        }
+        assertEquals(unselected, stored["unselected"])
+        assertEquals(active, stored["active"])
+    }
+    @Test fun bulkDeleteOnlyRemovesSelectedTasksStillArchived() = runTest {
+        val repo = TaskRepository(db)
+        listOf(Task("a", "A", done = true), Task("b", "B", done = true), Task("keep", "Keep", done = true), Task("active", "Active")).forEach { repo.save(it) }
+        repo.deleteArchived(listOf("a", "b", "active", "missing"))
+        assertEquals(setOf("keep", "active"), repo.snapshot().tasks.map { it.id }.toSet())
+        repo.deleteArchived(emptyList())
+        repo.reopenArchived(emptyList())
+        assertEquals(2, repo.snapshot().tasks.size)
+    }
+    @Test fun bulkActionsSupportMoreThanOneSqliteParameterBatch() = runTest {
+        val repo = TaskRepository(db)
+        val tasks = (1..1001).map { Task("task-$it", "Task", done = true) }
+        repo.restore(Backup(emptyList(), tasks))
+        repo.reopenArchived(tasks.map { it.id })
+        assertTrue(repo.snapshot().tasks.none { it.done })
+        repo.restore(Backup(emptyList(), tasks))
+        repo.deleteArchived(tasks.map { it.id })
+        assertTrue(repo.snapshot().tasks.isEmpty())
+    }
+    @Test fun bulkCompleteOnlyChangesSelectedPendingTasks() = runTest {
+        val repo = TaskRepository(db)
+        val a = Task("a", "A", note = "Keep description", priority = 2, createdAt = 100, updatedAt = 100)
+        val b = a.copy(id = "b")
+        val untouched = a.copy(id = "untouched")
+        val archived = a.copy(id = "archived", done = true)
+        listOf(a, b, untouched, archived).forEach { repo.save(it) }
+        repo.completeTasks(listOf("a", "b", "archived", "missing"))
+        val stored = repo.snapshot().tasks.associateBy { it.id }
+        for (original in listOf(a, b)) {
+            val completed = stored.getValue(original.id)
+            assertTrue(completed.done)
+            assertTrue(completed.updatedAt > original.updatedAt)
+            assertEquals(original.copy(done = true, updatedAt = completed.updatedAt), completed)
+        }
+        assertEquals(untouched, stored["untouched"])
+        assertEquals(archived, stored["archived"])
+    }
+    @Test fun bulkDeletePendingDoesNotDeleteUnselectedOrAlreadyCompletedTasks() = runTest {
+        val repo = TaskRepository(db)
+        listOf(Task("a", "A"), Task("b", "B"), Task("keep", "Keep"), Task("archived", "Archived", done = true)).forEach { repo.save(it) }
+        repo.deletePending(listOf("a", "b", "archived", "missing"))
+        assertEquals(setOf("keep", "archived"), repo.snapshot().tasks.map { it.id }.toSet())
+    }
 }

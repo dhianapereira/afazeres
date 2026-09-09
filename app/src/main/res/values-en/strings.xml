@@ -119,4 +119,12 @@
     <string name="task_status">Status</string>
     <string name="task_completed">Completed</string>
     <string name="task_pending">Pending</string>
+    <string name="select_tasks">Select</string>
+    <string name="select_all">Select all</string>
+    <string name="clear_selection">Clear selection</string>
+    <string name="unarchive_selected">Unarchive</string>
+    <string name="delete_selected">Delete selected</string>
+    <plurals name="selected_tasks"><item quantity="one">%d selected</item><item quantity="other">%d selected</item></plurals>
+    <plurals name="delete_tasks_confirmation"><item quantity="one">Permanently delete %d selected task? This action cannot be undone.</item><item quantity="other">Permanently delete %d selected tasks? This action cannot be undone.</item></plurals>
+    <string name="complete_selected">Complete</string>
 </resources>

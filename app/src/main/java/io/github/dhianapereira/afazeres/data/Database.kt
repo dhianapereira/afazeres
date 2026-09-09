@@ -18,6 +18,14 @@ interface AfazeresDao {
     @Delete suspend fun delete(task: Task)
     @Delete suspend fun delete(category: Category)
     @Query("SELECT COUNT(*) FROM tasks WHERE categoryId = :categoryId") suspend fun categoryTaskCount(categoryId: String): Int
+    @Query("UPDATE tasks SET done = 1, updatedAt = :updatedAt WHERE done = 0 AND id IN (:ids)")
+    suspend fun completeTasks(ids: List<String>, updatedAt: Long)
+    @Query("DELETE FROM tasks WHERE done = 0 AND id IN (:ids)")
+    suspend fun deletePending(ids: List<String>)
+    @Query("UPDATE tasks SET done = 0, updatedAt = :updatedAt WHERE done = 1 AND id IN (:ids)")
+    suspend fun reopenArchived(ids: List<String>, updatedAt: Long)
+    @Query("DELETE FROM tasks WHERE done = 1 AND id IN (:ids)")
+    suspend fun deleteArchived(ids: List<String>)
     @Query("DELETE FROM tasks") suspend fun clearTasks()
     @Query("DELETE FROM categories") suspend fun clearCategories()
     @Query("SELECT * FROM tasks ORDER BY createdAt, id") suspend fun snapshotTasks(): List<Task>
@@ -34,6 +42,20 @@ class TaskRepository(private val db: AfazeresDatabase) {
     suspend fun delete(category: Category) = db.withTransaction {
         if (db.dao().categoryTaskCount(category.id) > 0) throw CategoryInUseException()
         db.dao().delete(category)
+    }
+    suspend fun completeTasks(ids: List<String>) = db.withTransaction {
+        val updatedAt = System.currentTimeMillis()
+        ids.distinct().chunked(900).forEach { db.dao().completeTasks(it, updatedAt) }
+    }
+    suspend fun deletePending(ids: List<String>) = db.withTransaction {
+        ids.distinct().chunked(900).forEach { db.dao().deletePending(it) }
+    }
+    suspend fun reopenArchived(ids: List<String>) = db.withTransaction {
+        val updatedAt = System.currentTimeMillis()
+        ids.distinct().chunked(900).forEach { db.dao().reopenArchived(it, updatedAt) }
+    }
+    suspend fun deleteArchived(ids: List<String>) = db.withTransaction {
+        ids.distinct().chunked(900).forEach { db.dao().deleteArchived(it) }
     }
     suspend fun snapshot(): Backup = db.withTransaction { Backup(db.dao().snapshotCategories(), db.dao().snapshotTasks()) }
     suspend fun restore(backup: Backup) = db.withTransaction {

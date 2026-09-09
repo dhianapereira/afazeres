@@ -120,4 +120,12 @@
     <string name="task_status">Status</string>
     <string name="task_completed">Concluído</string>
     <string name="task_pending">Pendente</string>
+    <string name="select_tasks">Selecionar</string>
+    <string name="select_all">Selecionar todos</string>
+    <string name="clear_selection">Limpar seleção</string>
+    <string name="unarchive_selected">Desarquivar</string>
+    <string name="delete_selected">Excluir selecionados</string>
+    <plurals name="selected_tasks"><item quantity="one">%d selecionado</item><item quantity="other">%d selecionados</item></plurals>
+    <plurals name="delete_tasks_confirmation"><item quantity="one">Excluir permanentemente %d afazer selecionado? Essa ação não pode ser desfeita.</item><item quantity="other">Excluir permanentemente %d afazeres selecionados? Essa ação não pode ser desfeita.</item></plurals>
+    <string name="complete_selected">Concluir</string>
 </resources>

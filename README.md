@@ -13,6 +13,7 @@ O Afazeres permite anotar uma tarefa diretamente na tela inicial e adicionar os 
 - Ordenação por prioridade: alta, média, baixa e sem prioridade.
 - Filtros combinados por prioridade e categoria, acessíveis por um botão na tela inicial.
 - Arquivamento automático ao concluir, com acesso aos arquivados pelas configurações e opção de reabrir.
+- Seleção múltipla ao segurar um afazer nas listas, com ações para concluir, desarquivar ou excluir os selecionados.
 - Criação, edição, visualização e exclusão de categorias com nome, cor principal e ícone independentes.
 - Cores personalizadas com prévia, paleta, controles de cor e código hexadecimal.
 - Exclusão de categorias bloqueada enquanto houver afazeres vinculados, inclusive arquivados.

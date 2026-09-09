@@ -143,9 +143,12 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                                 )
                                 Spacer(Modifier.height(16.dp))
                                 val filtered = tasks.filter { !it.done && (priorityFilter == null || it.priority == priorityFilter) && (categoryFilter == null || it.categoryId == categoryFilter) }
-                                if (filtered.isEmpty()) EmptyState(if (priorityFilter != null || categoryFilter != null) R.string.empty_filtered else R.string.empty_tasks)
-                                else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                                    items(filtered, key = { it.id }) { item -> TaskCard(item, categories.find { it.id == item.categoryId }) { selected = item.id } }
+                                key(tab, categoryFilter, priorityFilter) {
+                                    TaskList(
+                                        tasks = filtered, categories = categories, busy = busy, error = operationError,
+                                        archived = false, emptyLabel = if (priorityFilter != null || categoryFilter != null) R.string.empty_filtered else R.string.empty_tasks,
+                                        open = { selected = it }, changeStatus = vm::completeTasks, delete = vm::deletePending,
+                                    )
                                 }
                             }
                             tab == 1 && categories.isEmpty() -> EmptyState(R.string.empty_categories)
@@ -164,12 +167,11 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                                 }
                             }
                             tab == 2 && settingsPage == "archived" -> {
-                                val archived = tasks.filter { it.done }
-                                if (archived.isEmpty()) EmptyState(R.string.empty_archived)
-                                else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                                    item { Text(stringResource(R.string.archived_description), Modifier.padding(bottom = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                                    items(archived, key = { it.id }) { item -> TaskCard(item, categories.find { it.id == item.categoryId }) { selected = item.id } }
-                                }
+                                TaskList(
+                                    tasks = tasks.filter { it.done }, categories = categories, busy = busy, error = operationError,
+                                    archived = true, emptyLabel = R.string.empty_archived,
+                                    open = { selected = it }, changeStatus = vm::reopenArchived, delete = vm::deleteArchived,
+                                )
                             }
                             else -> SettingsContent(
                                 page = settingsPage,
@@ -253,8 +255,8 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
         Text(categoryName(category), Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = categoryContentColor(category))
     }
 }
-@Composable private fun TaskCard(task: Task, category: Category?, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
+@Composable internal fun TaskCard(task: Task, category: Category?, enabled: Boolean = true, onLongClick: () -> Unit, onClick: () -> Unit) {
+    Surface(modifier = Modifier.combinedClickable(enabled = enabled, onClick = onClick, onLongClickLabel = stringResource(R.string.select_tasks), onLongClick = onLongClick), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.padding(top = 6.dp).size(11.dp).background(category?.let { Color(it.color) } ?: priorityColor(task.priority), CircleShape))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {

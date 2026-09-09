@@ -40,6 +40,10 @@ class AfazeresViewModel(application: Application) : AndroidViewModel(application
     fun save(category: Category, success: () -> Unit) = perform(success) { repository.save(category.copy(name = category.name.trim())) }
     fun delete(task: Task, success: () -> Unit) = perform(success) { repository.delete(task) }
     fun delete(category: Category, success: () -> Unit) = perform(success) { repository.delete(category) }
+    fun completeTasks(ids: List<String>, success: () -> Unit) = perform(success) { repository.completeTasks(ids) }
+    fun deletePending(ids: List<String>, success: () -> Unit) = perform(success) { repository.deletePending(ids) }
+    fun reopenArchived(ids: List<String>, success: () -> Unit) = perform(success) { repository.reopenArchived(ids) }
+    fun deleteArchived(ids: List<String>, success: () -> Unit) = perform(success) { repository.deleteArchived(ids) }
     fun theme(value: String) = perform { app.preferences.theme(value) }
     fun export(uri: Uri) = perform {
         val text = BackupCodec.encode(repository.snapshot())
