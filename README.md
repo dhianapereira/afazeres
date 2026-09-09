@@ -105,4 +105,4 @@ A preparação da assinatura, o versionamento e a geração dos artefatos estão
 
 O código-fonte está licenciado sob a [Licença MIT](./LICENSE).
 
-O nome "Afazeres", o logotipo, os ícones, as capturas de tela e os elementos de identidade visual não estão cobertos pela Licença MIT e permanecem sob a condição de Todos os direitos reservados.
+O logotipo, os ícones, as capturas de tela e os elementos de identidade visual não estão cobertos pela Licença MIT e permanecem sob a condição de Todos os direitos reservados.
