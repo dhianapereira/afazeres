@@ -10,6 +10,8 @@ O Afazeres permite anotar uma tarefa diretamente na tela inicial e adicionar os 
 - Edição de afazeres em página própria, com título obrigatório e status pendente ou concluído.
 - Exclusão, conclusão e reabertura de afazeres.
 - Descrição, categoria e prioridade opcionais.
+- Categoria e prioridade automáticas com aprendizado local por Naive Bayes, a partir das escolhas confirmadas pelo usuário.
+- Auditoria do aprendizado com exemplos por valor, simulação de títulos, controle do preenchimento e reset independente de categoria e prioridade.
 - Ordenação por prioridade: alta, média, baixa e sem prioridade.
 - Filtros combinados por prioridade e categoria, acessíveis por um botão na tela inicial.
 - Arquivamento automático ao concluir, com acesso aos arquivados pelas configurações e opção de reabrir.
@@ -100,6 +102,14 @@ As traduções ficam em `app/src/main/res/values/` e `app/src/main/res/values-en
 ## Releases
 
 A preparação da assinatura, o versionamento e a geração dos artefatos estão descritos na [documentação do processo de release](./docs/RELEASE.md).
+
+## Aprendizado local
+
+O app começa sem exemplos de treinamento. Com o uso, aprende separadamente a categoria e a prioridade a partir dos títulos e das escolhas manuais. Previsões automáticas não são usadas como exemplos até serem confirmadas. Quando não há evidência suficiente, os campos continuam sem preenchimento.
+
+Ao excluir tarefas, o modelo pode preservar contagens de palavras, sem copiar o título original. A opção de excluir e esquecer também remove essa contribuição. A auditoria mostra apenas a quantidade de exemplos removidos.
+
+Os dados permanecem no dispositivo. Consulte [como funciona o aprendizado](./docs/LEARNING.md) para conhecer os critérios, as limitações e o comportamento do backup.
 
 ## Licença
 
