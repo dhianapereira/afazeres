@@ -13,23 +13,25 @@ O Afazeres permite anotar uma tarefa diretamente na tela inicial e adicionar os 
 - Categoria e prioridade automáticas com aprendizado local por Naive Bayes, a partir das escolhas confirmadas pelo usuário.
 - Auditoria do aprendizado com exemplos por valor, simulação de títulos, controle do preenchimento e reset independente de categoria e prioridade.
 - Ordenação por prioridade: alta, média, baixa e sem prioridade.
-- Filtros combinados por prioridade e categoria, acessíveis por um botão na tela inicial.
+- Filtros combinados por prioridade e categoria, com contagem de tarefas que acompanha os filtros.
+- Listas paginadas, com até 20 itens por página.
 - Arquivamento automático ao concluir, com acesso aos arquivados pelas configurações e opção de reabrir.
-- Seleção múltipla ao segurar um afazer nas listas, com ações para concluir, desarquivar ou excluir os selecionados.
+- Seleção múltipla ao segurar um afazer nas listas, com ações para concluir, desarquivar ou excluir os selecionados. Selecionar e desmarcar todos afeta a página atual e preserva as escolhas nas outras páginas.
+- Deslize da direita para a esquerda para concluir (ou desarquivar nos arquivados) e da esquerda para a direita para abrir a confirmação de exclusão. Gestos ficam desativados durante a seleção múltipla.
 - Criação, edição, visualização e exclusão de categorias com nome, cor principal e ícone independentes.
 - Cores personalizadas com prévia, paleta, controles de cor e código hexadecimal.
 - Exclusão de categorias bloqueada enquanto houver afazeres vinculados, inclusive arquivados.
 - Temas claro, escuro ou definido pelo sistema.
 - Interface em português e inglês.
-- Exportação e restauração dos afazeres e categorias por arquivos JSON.
-- Configurações com preferências, dados e backup, informações legais e sobre o app.
+- Exportação e restauração dos afazeres, categorias e histórico de treinamento por arquivos JSON.
+- Configurações com preferências, dados e backup, aprendizado local, informações legais e sobre o app. Política de privacidade e termos abrem no navegador.
 - Funcionamento inteiramente offline, sem conta ou servidor externo.
 
 ## Privacidade
 
 Os afazeres, categorias e preferências ficam armazenados localmente no dispositivo. O Afazeres não possui acesso à internet, não exibe anúncios e não utiliza serviços de análise ou rastreamento.
 
-Os arquivos exportados são salvos no destino escolhido pela pessoa. A restauração substitui os afazeres e categorias atuais após confirmação, mantendo as preferências de tema e idioma.
+Os arquivos exportados são salvos no destino escolhido pela pessoa. A restauração substitui os afazeres, categorias e histórico de treinamento atuais após confirmação, mantendo as preferências de tema, idioma e preenchimento automático. Backups JSON não são criptografados pelo app.
 
 ## Tecnologias
 
@@ -92,6 +94,9 @@ O projeto utiliza MVVM e organiza persistência e interface por responsabilidade
 - `data/Preferences.kt`: preferências persistidas com DataStore.
 - `ui/AfazeresViewModel.kt`: estado da interface e coordenação das operações de dados.
 - `ui/AfazeresApp.kt`: navegação, afazeres, categorias, detalhes e formulários.
+- `ui/TaskList.kt`: paginação, seleção múltipla e gestos das listas de tarefas.
+- `ui/LearningScreen.kt`: auditoria, simulação e reset do aprendizado.
+- `model/nlp/`: tokenização, classificação Naive Bayes e exemplos de treinamento.
 - `ui/CategoryEditor.kt`: formulários de categoria, seleção de cores e ícones.
 - `model/CategoryAppearance.kt`: catálogo de ícones e validação de cores.
 - `ui/SettingsScreen.kt`: preferências, dados e backup, informações legais e sobre o app.
@@ -107,7 +112,7 @@ A preparação da assinatura, o versionamento e a geração dos artefatos estão
 
 O app começa sem exemplos de treinamento. Com o uso, aprende separadamente a categoria e a prioridade a partir dos títulos e das escolhas manuais. Previsões automáticas não são usadas como exemplos até serem confirmadas. Quando não há evidência suficiente, os campos continuam sem preenchimento.
 
-Ao excluir tarefas, o modelo pode preservar contagens de palavras, sem copiar o título original. A opção de excluir e esquecer também remove essa contribuição. A auditoria mostra apenas a quantidade de exemplos removidos.
+Ao excluir tarefas, o modelo pode preservar contagens de palavras, sem copiar o título original. A opção de excluir e esquecer também remove essa contribuição. A auditoria agrupa os exemplos em seções recolhíveis e paginadas. Tarefas existentes, inclusive arquivadas, mantêm o título visível; tarefas removidas aparecem apenas na contagem. As contagens de palavras ainda revelam vocabulário e não são anonimização.
 
 Os dados permanecem no dispositivo. Consulte [como funciona o aprendizado](./docs/LEARNING.md) para conhecer os critérios, as limitações e o comportamento do backup.
 
