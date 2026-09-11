@@ -166,7 +166,7 @@
     <string name="next_page">Next page</string>
     <string name="page_position">Page %1$d of %2$d</string>
     <string name="pending_total">Pending tasks: %1$d</string>
-    <string name="clear_page_selection">Deselect page</string>
+    <string name="deselect_all">Deselect all</string>
     <string name="expand_group">Expand group</string>
     <string name="collapse_group">Collapse group</string>
     <string name="training_task_deleted">Deleted task · learning preserved</string>

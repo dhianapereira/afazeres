@@ -26,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
@@ -147,7 +148,7 @@ fun AfazeresApp(vm: AfazeresViewModel) {
                                 Spacer(Modifier.height(16.dp))
                                 val filtered = tasks.filter { !it.done && (priorityFilter == null || it.priority == priorityFilter) && (categoryFilter == null || it.categoryId == categoryFilter) }
                                 Text(
-                                    stringResource(R.string.pending_total, tasks.count { !it.done }),
+                                    stringResource(R.string.pending_total, filtered.size),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(bottom = 8.dp),
@@ -281,7 +282,7 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
     }
 }
 @Composable internal fun TaskCard(task: Task, category: Category?, enabled: Boolean = true, onLongClick: () -> Unit, onClick: () -> Unit) {
-    Surface(modifier = Modifier.combinedClickable(enabled = enabled, onClick = onClick, onLongClickLabel = stringResource(R.string.select_tasks), onLongClick = onLongClick), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
+    Surface(modifier = Modifier.clip(MaterialTheme.shapes.medium).combinedClickable(enabled = enabled, onClick = onClick, onLongClickLabel = stringResource(R.string.select_tasks), onLongClick = onLongClick), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.padding(top = 6.dp).size(11.dp).background(category?.let { Color(it.color) } ?: priorityColor(task.priority), CircleShape))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -296,7 +297,7 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
     }
 }
 @Composable private fun Detail(task: Task, categories: List<Category>, back: () -> Unit, edit: () -> Unit, complete: () -> Unit, delete: () -> Unit, busy: Boolean) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             IconButton(onClick = back) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
             IconButton(onClick = edit, enabled = !busy) { Icon(Icons.Outlined.Edit, stringResource(R.string.edit_task)) }
@@ -304,12 +305,11 @@ private fun priorityIcon(priority: Int) = when (priority) { -1 -> Icons.Outlined
         Surface(shape = CircleShape, color = priorityColor(task.priority).copy(alpha = .13f)) { Icon(priorityIcon(task.priority), null, Modifier.padding(20.dp).size(32.dp), tint = priorityColor(task.priority)) }
         Text(stringResource(priorityLabel(task.priority)), color = priorityColor(task.priority))
         if (task.priority >= 0 && !task.priorityConfirmed) Text(stringResource(R.string.priority_automatic), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(task.title, style = MaterialTheme.typography.headlineLarge)
-        Text(stringResource(if (task.done) R.string.task_completed else R.string.task_pending), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .4f))
-        Text(stringResource(R.string.category), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        categories.find { it.id == task.categoryId }?.let { CategoryBadge(it) } ?: Text(stringResource(R.string.no_category))
-        if (task.categoryId != null && !task.categoryConfirmed) Text(stringResource(R.string.category_automatic), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(task.title, style = MaterialTheme.typography.headlineLarge)
+            categories.find { it.id == task.categoryId }?.let { CategoryBadge(it) }
+            if (task.categoryId != null && !task.categoryConfirmed) Text(stringResource(R.string.category_automatic), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .4f))
         Text(stringResource(R.string.note_label), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(task.note.ifBlank { stringResource(R.string.no_note) })
