@@ -4,6 +4,17 @@ Aplicativo Android para registrar seus afazeres e organizar o que precisa ser fe
 
 O Afazeres permite anotar uma tarefa diretamente na tela inicial e adicionar os detalhes depois. Descrição, categoria e prioridade são opcionais. Os afazeres de maior prioridade aparecem primeiro, ajudando a escolher por onde começar, sem precisar definir datas de entrega.
 
+[Baixar a versão mais recente](https://github.com/dhianapereira/afazeres/releases/latest)
+
+## O app por dentro
+
+<p align="center">
+  <img src="./assets/afazeres-app-01.jpg" alt="Lista de tarefas do Afazeres com prioridades, categorias e paginação" width="23%">
+  <img src="./assets/afazeres-app-02.jpg" alt="Detalhes de uma tarefa do Afazeres com categoria e ações de concluir e excluir" width="23%">
+  <img src="./assets/afazeres-app-03.jpg" alt="Lista de categorias do Afazeres com cores, ícones e contagem de tarefas" width="23%">
+  <img src="./assets/afazeres-app-04.jpg" alt="Tela de aprendizado local do Afazeres com exemplos de treinamento e simulação" width="23%">
+</p>
+
 ## Funcionalidades
 
 - Cadastro rápido de afazeres pelo campo da tela inicial, com envio pelo botão + ou pelo teclado.
